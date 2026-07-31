@@ -408,6 +408,23 @@ $('botCountInput').addEventListener('input', ()=>{
   const v=parseInt($('botCountInput').value);
   botCount = v ? clamp(v,1,60) : 0;   // 0 = use difficulty default
 });
+$('mpCreateBtn').onclick=()=>{
+  const code=mpGenRoomCode();
+  $('mpCodeInput').value=code;
+  mpJoinRoom(code, true);
+  $('mpCreateBtn').style.display='none'; $('mpJoinBtn').style.display='none'; $('mpLeaveBtn').style.display='inline-block';
+};
+$('mpJoinBtn').onclick=()=>{
+  const code=$('mpCodeInput').value.trim().toUpperCase();
+  if(code.length<3){ $('mpStatus').textContent='❌ Type a room code first'; return; }
+  mpJoinRoom(code, false);
+  $('mpCreateBtn').style.display='none'; $('mpJoinBtn').style.display='none'; $('mpLeaveBtn').style.display='inline-block';
+};
+$('mpLeaveBtn').onclick=()=>{
+  mpLeaveRoom();
+  $('mpCodeInput').value=''; $('mpStatus').textContent='';
+  $('mpCreateBtn').style.display='inline-block'; $('mpJoinBtn').style.display='inline-block'; $('mpLeaveBtn').style.display='none';
+};
 
 // ---------- three ----------
 const scene = new THREE.Scene();
@@ -2458,6 +2475,111 @@ async function fetchTop(n=10){
 function diffMult(d){ d=(d||'').toUpperCase(); if(d.startsWith('PIECE'))return 1; if(d.startsWith("LET"))return 1.5; if(d.startsWith('COME'))return 2; if(d.startsWith('DAMN'))return 3; return 1; }
 function gscore(r){ const m=diffMult(r.diff); return Math.round((r.kills||0)*m + (r.win?10*m:0) + (r.bonus||0)); }
 function diffBadge(d){ d=(d||'').toUpperCase(); if(d.startsWith('PIECE'))return '🍰'; if(d.startsWith("LET"))return '🎸'; if(d.startsWith('COME'))return '💀'; if(d.startsWith('DAMN'))return '☠️'; return '·'; }
+
+// ---------- WAVE3: real multiplayer via Supabase Realtime (2-4 friends; host stays authoritative for bots/boss/storm) ----------
+let mpChannel=null, mpIsHost=true, mpRoomCode=null, mpPlayerId=null, mpLastSend=0, mpLastHostSend=0;
+const netPlayers={};   // id -> networked friend avatar (built from makeBot, driven by broadcasts instead of AI)
+function mpGenRoomCode(){ const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=A[Math.floor(Math.random()*A.length)]; return s; }
+function mpLeaveRoom(){
+  if(mpChannel){ try{ mpChannel.unsubscribe(); }catch(e){} mpChannel=null; }
+  for(const id in netPlayers){ scene.remove(netPlayers[id].mesh); delete netPlayers[id]; }
+  mpRoomCode=null; mpIsHost=true; mpPlayerId=null;
+}
+function mpJoinRoom(code, asHost){
+  if(!window.supabase){ showMsg('❌ Multiplayer unavailable — could not load networking library',1800); return; }
+  mpLeaveRoom();
+  mpRoomCode=code; mpIsHost=asHost; mpPlayerId=Math.random().toString(36).slice(2,10);
+  const sb=window.supabase.createClient(SB_URL, SB_KEY);
+  const ch=sb.channel('fr-room-'+code, {config:{presence:{key:mpPlayerId}}});
+  ch.on('presence',{event:'sync'},()=>mpSyncPresence(ch));
+  ch.on('broadcast',{event:'state'},({payload})=>{ if(payload.id!==mpPlayerId) mpApplyPlayerState(payload); });
+  ch.on('broadcast',{event:'host'},({payload})=>{ if(!mpIsHost) mpApplyHostState(payload); });
+  ch.subscribe(async (status)=>{
+    if(status==='SUBSCRIBED'){
+      await ch.track({name:(players[activeP]&&players[activeP].name)||'Player', host:mpIsHost});
+      $('mpStatus').textContent = asHost ? '🌐 Room '+code+' — waiting for friends…' : '🌐 Joined room '+code;
+      showMsg(asHost ? '🌐 ROOM '+code+' CREATED — share the code!' : '🌐 JOINED ROOM '+code, 2200);
+    } else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT'){
+      $('mpStatus').textContent='❌ Connection failed — try again';
+    }
+  });
+  mpChannel=ch;
+}
+function mpSyncPresence(ch){
+  const state=ch.presenceState();
+  const seen=new Set();
+  let n=0;
+  for(const key in state){
+    n++;
+    if(key===mpPlayerId) continue;
+    seen.add(key);
+    if(!netPlayers[key]){
+      const meta=state[key][0]||{};
+      netPlayers[key]=mpMakeNetPlayer(key, meta.name||'Friend');
+    }
+  }
+  for(const id in netPlayers){ if(!seen.has(id)) mpRemoveNetPlayer(id); }
+  const st=$('mpStatus'); if(st) st.textContent = '🌐 Room '+mpRoomCode+' — '+n+' player'+(n===1?'':'s')+' connected';
+}
+function mpMakeNetPlayer(id,name){
+  const b=makeBot(name);
+  return {id,name,mesh:b.mesh,head:b.head,body:b.body,tag:b.tag,tagCv:b.tagCv,tagTex:b.tagTex,hpShown:-1,col:b.col,
+    tx:b.mesh.position.x,ty:0,tz:b.mesh.position.z,tyaw:0,alive:true,swing:0,phase:rand(0,6),
+    legL:b.legL,legR:b.legR,armL:b.armL,armR:b.armR,moving:false,hp:100,maxHp:100,boss:false};
+}
+function mpRemoveNetPlayer(id){
+  if(netPlayers[id]){ scene.remove(netPlayers[id].mesh); delete netPlayers[id]; }
+}
+function mpApplyPlayerState(p){
+  const np=netPlayers[p.id]; if(!np) return;
+  np.tx=p.x; np.ty=p.y; np.tz=p.z; np.tyaw=p.yaw; np.alive=p.alive; np.moving=p.moving;
+}
+function mpUpdateNetPlayers(dt){
+  for(const id in netPlayers){
+    const np=netPlayers[id];
+    np.mesh.position.x+=(np.tx-np.mesh.position.x)*Math.min(1,dt*12);
+    np.mesh.position.y+=(np.ty-np.mesh.position.y)*Math.min(1,dt*12);
+    np.mesh.position.z+=(np.tz-np.mesh.position.z)*Math.min(1,dt*12);
+    const cy=np.mesh.rotation.y;
+    np.mesh.rotation.y = cy + Math.atan2(Math.sin(np.tyaw-cy), Math.cos(np.tyaw-cy))*Math.min(1,dt*12);
+    np.mesh.visible = np.alive;
+    if(np.moving){ np.phase+=dt*8*1.35; np.swing=Math.min(1,np.swing+dt*6); } else np.swing=Math.max(0,np.swing-dt*6);
+    const sw=Math.sin(np.phase)*.62*np.swing;
+    np.legL.rotation.x=sw; np.legR.rotation.x=-sw; np.armL.rotation.x=-sw*.85; np.armR.rotation.x=sw*.85;
+  }
+}
+function mpBroadcastState(now){
+  if(!mpChannel || now-mpLastSend<80) return;   // ~12Hz
+  mpLastSend=now;
+  mpChannel.send({type:'broadcast', event:'state', payload:{
+    id:mpPlayerId, x:player.pos.x, y:player.pos.y-EYE, z:player.pos.z, yaw:player.yaw, alive:player.alive,
+    moving: Math.hypot(player.vel.x,player.vel.z)>.3 }});
+}
+function mpBroadcastHostState(now){
+  if(!mpChannel || !mpIsHost || now-mpLastHostSend<130) return;   // ~7-8Hz
+  mpLastHostSend=now;
+  mpChannel.send({type:'broadcast', event:'host', payload:{
+    bots: bots.map(b=>({name:b.name, x:b.mesh.position.x, z:b.mesh.position.z, ry:b.mesh.rotation.y,
+      hp:b.hp, maxHp:b.maxHp||100, alive:b.alive, boss:!!b.boss, scale:b.mesh.scale.x, moving:!!b.moving})),
+    storm:{stormR,stormTarget,stormShrinkRate,phaseIx,phaseTimer,shrinking,bossSpawned} }});
+}
+function mpApplyHostState(msg){
+  if(msg.storm){
+    stormR=msg.storm.stormR; stormTarget=msg.storm.stormTarget; stormShrinkRate=msg.storm.stormShrinkRate;
+    phaseIx=msg.storm.phaseIx; phaseTimer=msg.storm.phaseTimer; shrinking=msg.storm.shrinking; bossSpawned=msg.storm.bossSpawned;
+  }
+  if(msg.bots){
+    for(let i=0;i<msg.bots.length;i++){
+      const rec=msg.bots[i];
+      let b=bots[i];
+      if(!b){ b=makeBot(rec.name); b.mesh.scale.setScalar(rec.scale||1); if(rec.boss){ b.boss=true; bossRef=b; } bots[i]=b; }
+      b.mesh.position.set(rec.x,0,rec.z); b.mesh.rotation.y=rec.ry; b.maxHp=rec.maxHp; b.moving=rec.moving;
+      if(b.alive && !rec.alive && b.mesh.parent){ feed(`💀 <b>${b.name}</b> was eliminated`); voxelBurst(b.mesh.position, b.col); scene.remove(b.mesh); }
+      b.hp=rec.hp; b.alive=rec.alive;
+    }
+    updateAlive();
+  }
+}
 function lbHtml(rows){
   if(!rows.length) return 'No champions yet — be the first!';
   // career cards for local player profiles
@@ -2784,8 +2906,10 @@ $('playBtn').onclick=()=>{
   for(const s of towerChestSpots) spawnChest(s.x, s.z, s.y);          // WAVE2: tower loot — rooftop + ground floor
   if(mutator!=='knives') for(let i=0;i<8;i++) spawnFloorGun(lootGunKey(), rand(-MAP*.7,MAP*.7), rand(-MAP*.7,MAP*.7));   // WAVE2 mutators
   for(let i=0;i<18;i++) spawnPickup(['shield','med','shield','ammo'][i%4], rand(-MAP*.7,MAP*.7), rand(-MAP*.7,MAP*.7));
-  const nBots = botCount || D.bots;
-  for(let i=0;i<nBots;i++) bots.push(makeBot(BOT_NAMES[i%BOT_NAMES.length]));
+  if(mpIsHost){   // WAVE3: joining friends mirror the host's bots/boss over the network instead of spawning their own
+    const nBots = botCount || D.bots;
+    for(let i=0;i<nBots;i++) bots.push(makeBot(BOT_NAMES[i%BOT_NAMES.length]));
+  }
   makeKart(player.pos.x+5, player.pos.z-4);                        // kart parked near spawn
   makeKart(rand(-MAP*.55,MAP*.55), rand(-MAP*.55,MAP*.55));        // one random
   dropTimer=rand(35,50);
@@ -3199,19 +3323,20 @@ function loop(){
       $('graceT').textContent='🕊 '+Math.max(0,Math.ceil(grace));
       if(grace<=0){ $('graceT').style.display='none'; announce(Math.random()<.3?'g80_bubblegum':'weaponsfree',.9,0,true); showMsg('⚔️ WEAPONS FREE!'); }
     }
-    // storm
-    if(!shrinking){
-      phaseTimer-=dt;
-      $('storm').textContent=`⛈ Storm shrinks in ${Math.max(0,Math.ceil(phaseTimer))}s`;
-      if(phaseTimer<=0&&phaseIx<stormPhases.length){ shrinking=true; stormTarget=stormPhases[phaseIx].to; stormShrinkRate=stormPhases[phaseIx].rate;
-        announce(Math.random()<.5?'g80_choppah':'storm',.8);   // WAVE2: "GET TO THE CHOPPAH" alternates with the storm line
-        if(phaseIx===1&&!bossSpawned){ if(bcfg('dad','off',0)===1) bossSpawned=true; else spawnBoss(); } }   // boss drops at the start of the second shrink
-    } else {
-      stormR=Math.max(stormTarget,stormR-stormShrinkRate*dt*10);
-      $('storm').textContent='⛈ STORM CLOSING — get inside!';
-      if(stormR<=stormTarget){ shrinking=false; phaseIx++;
-        phaseTimer=phaseIx<stormPhases.length?stormPhases[phaseIx].wait:9999; }
+    // storm — WAVE3: joining friends mirror this from the host's broadcast instead of simulating it themselves
+    if(mpIsHost){
+      if(!shrinking){
+        phaseTimer-=dt;
+        if(phaseTimer<=0&&phaseIx<stormPhases.length){ shrinking=true; stormTarget=stormPhases[phaseIx].to; stormShrinkRate=stormPhases[phaseIx].rate;
+          announce(Math.random()<.5?'g80_choppah':'storm',.8);   // WAVE2: "GET TO THE CHOPPAH" alternates with the storm line
+          if(phaseIx===1&&!bossSpawned){ if(bcfg('dad','off',0)===1) bossSpawned=true; else spawnBoss(); } }   // boss drops at the start of the second shrink
+      } else {
+        stormR=Math.max(stormTarget,stormR-stormShrinkRate*dt*10);
+        if(stormR<=stormTarget){ shrinking=false; phaseIx++;
+          phaseTimer=phaseIx<stormPhases.length?stormPhases[phaseIx].wait:9999; }
+      }
     }
+    $('storm').textContent = shrinking ? '⛈ STORM CLOSING — get inside!' : `⛈ Storm shrinks in ${Math.max(0,Math.ceil(phaseTimer))}s`;
     stormWall.scale.setScalar(stormR/200);
     stormWall2.scale.setScalar(stormR/199);
     stormWall2.rotation.y = now/4000;
@@ -3246,15 +3371,19 @@ function loop(){
     if(player.alive&&myDist>stormR){ scene.fog.color.setHex(0x6a2b8f); scene.background.setHex(0x6a2b8f); }
     else { scene.fog.color.copy(moodFog); scene.background.copy(moodSky); }
     if(player.alive&&myDist>stormR){ if(Math.floor(now/500)!==Math.floor((now-dt*1000)/500)) damagePlayer(3,'the Storm'); }
-    for(const b of bots){ if(b.alive&&Math.hypot(b.mesh.position.x,b.mesh.position.z)>stormR){
-      b.hp-=14*dt; if(b.hp<=0){ b.alive=false; feed(`⛈ the Storm consumed <b>${b.name}</b>`); voxelBurst(b.mesh.position, b.col); scene.remove(b.mesh); updateAlive(); } } }
-
-    for(const b of bots) botThink(b,dt,now);
+    if(mpIsHost){   // WAVE3: guests get resulting hp/alive/position from the host's broadcast instead
+      for(const b of bots){ if(b.alive&&Math.hypot(b.mesh.position.x,b.mesh.position.z)>stormR){
+        b.hp-=14*dt; if(b.hp<=0){ b.alive=false; feed(`⛈ the Storm consumed <b>${b.name}</b>`); voxelBurst(b.mesh.position, b.col); scene.remove(b.mesh); updateAlive(); } } }
+      for(const b of bots) botThink(b,dt,now);
+    }
     for(const b of bots){ if(!b.alive) continue;
       if(b.hp!==b.hpShown) drawTag(b);
       b.tag.visible = b.mesh.position.distanceTo(player.pos)<(b.boss?220:45); }
     stroyerDirector(dt);
     updateBossBar();   // WAVE2: boss HUD health strip
+    mpUpdateNetPlayers(dt);   // WAVE3: friends over the network
+    mpBroadcastState(now);
+    mpBroadcastHostState(now);
 
     // supply drops: timer, descent, landing glow
     dropTimer-=dt;
