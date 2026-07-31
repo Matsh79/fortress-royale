@@ -96,7 +96,7 @@ if(!players.length){ players = DEFAULT_PLAYERS; }
 players.forEach(p=>{
   if(p.pwd===undefined || p.pwd==='') p.pwd='password';
   const nm=(p.name||'').trim().toLowerCase();
-  if(nm==='mika' || nm==='guy') p.admin=true;
+  if(nm==='mika') p.admin=true;
   p.admin=!!p.admin; p.pending=!!p.pending;
 });
 activeP = clamp(parseInt(localStorage.getItem('fr_activeP')||'0')||0, 0, players.length-1);
@@ -294,7 +294,27 @@ let suChar=0;
 
 // ---------- WAVE2: admin panel + approval queue + invite links ----------
 function isAdmin(){ return loggedIn && players[activeP] && !!players[activeP].admin; }
-function updateAdminBtn(){ $('adminBtn').style.display = isAdmin() ? 'inline-block' : 'none'; }
+function updateAdminBtn(){
+  $('adminBtn').style.display = isAdmin() ? 'inline-block' : 'none';
+  const nPending = players.filter(p=>p.pending).length;
+  const ab=$('approvalsBtn');
+  ab.style.display = isAdmin() ? 'inline-block' : 'none';
+  ab.textContent = nPending ? `✅ APPROVALS (${nPending})` : '✅ APPROVALS';
+}
+function renderApprovals(){
+  const L=$('approvalsList'); L.innerHTML='';
+  const pending = players.map((p,i)=>({p,i})).filter(x=>x.p.pending);
+  if(!pending.length){ L.innerHTML='<div style="opacity:.6; font-size:13px;">No one is waiting — you\'re all caught up.</div>'; return; }
+  pending.forEach(({p,i})=>{
+    const d=document.createElement('div');
+    d.style.cssText='display:flex; align-items:center; gap:10px; padding:9px 10px; margin:6px 0; background:rgba(124,252,0,.08); border:2px solid rgba(124,252,0,.4); border-radius:12px;';
+    d.innerHTML = `<span style="font-size:22px;">${CHAR_COLORS[p.char||0].emoji}</span>
+      <b style="flex:1;">${p.name}</b>
+      <button onclick="admAct('approve',${i}); renderApprovals();" style="padding:6px 14px; border:none; border-radius:8px; background:#2e8b3a; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✅ APPROVE</button>`;
+    L.appendChild(d);
+  });
+}
+$('approvalsBtn').onclick=()=>{ if(!isAdmin()) return; renderApprovals(); $('approvalsOverlay').style.display='flex'; };
 function inviteURL(p){
   return location.origin + '/#invite=' + btoa(encodeURIComponent(JSON.stringify({n:p.name, p:p.pwd||'password', c:p.char||0})));
 }

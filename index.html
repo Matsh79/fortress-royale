@@ -200,6 +200,14 @@ html, body { overscroll-behavior:none; }
     <button onclick="document.getElementById('adminOverlay').style.display='none'" style="margin-top:14px; padding:8px 22px; border:none; border-radius:10px; background:#ffb400; font-weight:800; cursor:pointer;">CLOSE</button>
   </div>
 </div>
+<div id="approvalsOverlay" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:46; background:rgba(10,5,35,.9);">
+  <div style="background:#1a0f3d; border:3px solid #2e8b3a; border-radius:18px; padding:24px 28px; width:min(480px,94vw); max-height:88vh; overflow-y:auto; color:#e8e2ff;">
+    <div style="font-weight:900; font-size:22px; color:#7CFC00;">✅ PENDING APPROVALS</div>
+    <div style="font-size:12px; opacity:.6; margin-bottom:12px;">new recruits waiting to join the island</div>
+    <div id="approvalsList"></div>
+    <button onclick="document.getElementById('approvalsOverlay').style.display='none'" style="margin-top:14px; padding:8px 22px; border:none; border-radius:10px; background:#7CFC00; color:#123; font-weight:800; cursor:pointer;">CLOSE</button>
+  </div>
+</div>
 <div id="lobby">
   <h1>FORTRESS ROYALE</h1>
   <div class="sub">DROP &nbsp;&middot;&nbsp; LOOT &nbsp;&middot;&nbsp; LAST ONE STANDING</div>
@@ -236,6 +244,7 @@ html, body { overscroll-behavior:none; }
     <div style="display:flex; gap:8px;">
       <button id="lbBtn" style="font-size:13px; font-weight:800; padding:8px 22px; border:2px solid rgba(255,255,255,.3); border-radius:10px; background:rgba(0,0,0,.25); color:#ffe27a; cursor:pointer;">🏆 LEADERBOARD</button>
       <button id="adminBtn" style="display:none; font-size:13px; font-weight:800; padding:8px 22px; border:2px solid rgba(255,180,0,.6); border-radius:10px; background:rgba(0,0,0,.25); color:#ffd34d; cursor:pointer; font-family:inherit;">🛡 ADMIN</button>
+      <button id="approvalsBtn" style="display:none; font-size:13px; font-weight:800; padding:8px 22px; border:2px solid rgba(46,139,58,.7); border-radius:10px; background:rgba(0,0,0,.25); color:#7CFC00; cursor:pointer; font-family:inherit;">✅ APPROVALS</button>
     </div>
     <div class="hint"><b>WASD</b> move &middot; <b>Mouse</b> look &middot; <b>Click</b> shoot &middot; <b>1/2/3</b> weapon slots · <b>E</b> chests / loot / karts / supply drops &middot; <b>R</b> reload &middot; <b>Shift</b> sprint &middot; <b>Space</b> jump<br>
     <b>Q</b> build wall &middot; <b>F</b> build ramp &middot; <b>V</b> dance &middot; <b>Right-mouse</b> sniper scope<br>
