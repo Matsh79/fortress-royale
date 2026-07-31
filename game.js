@@ -590,11 +590,13 @@ for(let i=0;i<40;i++){
   const crown=new THREE.Group();
   const leafHex=i%3?0x3fae4f:0x7CFC00;
   for(let k=0;k<3;k++){
-    const blob=new THREE.Mesh(new THREE.IcosahedronGeometry(rand(1.4,2.4),0), toonMat({color:new THREE.Color(leafHex).offsetHSL(0,0,rand(-.06,.06))}));
-    blob.position.set(rand(-.9,.9), rand(-.4,.6), rand(-.9,.9));
+    // k===0 is a centered anchor blob (always overlaps the trunk top); the rest cluster tightly around it
+    const r = k===0 ? rand(1.8,2.6) : rand(1.3,2.0);
+    const blob=new THREE.Mesh(new THREE.IcosahedronGeometry(r,0), toonMat({color:new THREE.Color(leafHex).offsetHSL(0,0,rand(-.06,.06))}));
+    if(k>0) blob.position.set(rand(-.7,.7), rand(-.1,.5), rand(-.7,.7));
     blob.castShadow=true; crown.add(blob);
   }
-  crown.position.set(x,trunk.geometry.parameters.height+2.4,z);
+  crown.position.set(x, trunk.position.y+trunk.geometry.parameters.height/2+.4, z);
   scene.add(trunk,crown);
   trees.push({trunk,crown,x,z,hp:3,alive:true});
 }
@@ -819,9 +821,13 @@ function giveWeapon(key, rarity){
 }
 function giveWeaponBase(key, rarity){
   if(rarity===undefined) rarity=rollRarity();
-  // fill empty slot, else replace active (drop nothing — arcade style)
+  // fill empty slot, else replace active — the replaced weapon drops to the ground
   let slot = inv.findIndex(x=>x===null);
-  if(slot===-1) slot = activeSlot===0 ? 1 : activeSlot;   // never overwrite knife
+  if(slot===-1){
+    slot = activeSlot===0 ? 1 : activeSlot;   // never overwrite knife
+    const old=inv[slot];
+    if(old) spawnFloorGun(old.key, player.pos.x+rand(-1,1), player.pos.z+rand(-1,1), old.rarity);
+  }
   inv[slot] = { key, ammo: Math.round(WEAPONS[key].mag*upg.magMult), res: resMax(WEAPONS[key]), rarity };
   activeSlot = slot;
   renderSlots(); buildViewmodel();
@@ -3126,7 +3132,7 @@ function loop(){
 
       // interact hint
       const ni=nearestInteractable();
-      if(ni) $('interact').textContent = ni.t==='chest'?'E — open chest' : ni.t==='gun'?'E — pick up' : ni.t==='drop'?'E — open supply drop' : 'E — drive kart';
+      if(ni) $('interact').textContent = ni.t==='chest'?'E — open chest' : ni.t==='gun'?'E — pick up '+WEAPONS[ni.o.key].name : ni.t==='drop'?'E — open supply drop' : 'E — drive kart';
       $('interact').style.opacity = ni?1:0;
       if(isTouch) $('btnE').style.display = ni?'flex':'none';
     }
