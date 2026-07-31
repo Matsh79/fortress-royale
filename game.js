@@ -1156,21 +1156,13 @@ if(nightMode) applyNight(true);
 let crtMode=false; try{ crtMode=localStorage.getItem('fr_crt')==='1'; }catch(e){}
 function applyCrt(on){ crtMode=on; try{ localStorage.setItem('fr_crt', on?'1':'0'); }catch(e){} $('crt').style.display=on?'block':'none'; }
 applyCrt(crtMode);
-let mutator=''; try{ mutator=localStorage.getItem('fr_mutator')||''; }catch(e){}
-if(!['','wild','moon','knives'].includes(mutator)) mutator='';
+let mutator='';
 function lootGunKey(){ return mutator==='wild' ? 'deagle' : LOOT_GUNS[Math.floor(rand(0,LOOT_GUNS.length))]; }
-const MUTS=[['','🚫 OFF'],['wild','🤠 WILD WEST'],['moon','🌙 MOON GRAVITY'],['knives','🔪 KNIVES ONLY']];
 (function(){
   const paint=()=>{
-    [...$('muts').children].forEach((b,i)=>{ const on=MUTS[i][0]===mutator; b.style.borderColor=on?'#ffe93b':'rgba(255,255,255,.25)'; b.style.color=on?'#ffe93b':'#e8e2ff'; });
     tgl($('nightTgl'),nightMode); tgl($('crtTgl'),crtMode); tgl($('perfTgl'),perfMode);
   };
   const tgl=(b,on)=>{ b.style.borderColor=on?'#7CFC00':'rgba(255,255,255,.25)'; b.style.color=on?'#7CFC00':'#e8e2ff'; };
-  MUTS.forEach(([k,label])=>{
-    const b=document.createElement('button'); b.textContent=label; b.className='tgl';
-    b.onclick=()=>{ mutator=k; try{ localStorage.setItem('fr_mutator',k); }catch(e){} paint(); };
-    $('muts').appendChild(b);
-  });
   $('nightTgl').onclick=()=>{ applyNight(!nightMode); paint(); };
   $('crtTgl').onclick=()=>{ applyCrt(!crtMode); paint(); };
   $('perfTgl').onclick=()=>{ perfMode=!perfMode; try{ localStorage.setItem('fr_perf',perfMode?'1':'0'); }catch(e){} paint();
