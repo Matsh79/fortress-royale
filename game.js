@@ -92,12 +92,12 @@ const DEFAULT_PLAYERS = [
 let players = [], activeP = 0, editingP = -1, loggedIn = false;
 try { players = JSON.parse(localStorage.getItem('fr_players')) || []; } catch(e){ players = []; }
 if(!players.length){ players = DEFAULT_PLAYERS; }
-// WAVE2: profile migration — per-player passwords, admin flags, approval queue
+// WAVE2: profile migration — per-player passwords, admin flags
 players.forEach(p=>{
   if(p.pwd===undefined || p.pwd==='') p.pwd='password';
   const nm=(p.name||'').trim().toLowerCase();
   if(nm==='mika') p.admin=true;
-  p.admin=!!p.admin; p.pending=!!p.pending;
+  p.admin=!!p.admin;
 });
 activeP = clamp(parseInt(localStorage.getItem('fr_activeP')||'0')||0, 0, players.length-1);
 function savePlayers(){ try { localStorage.setItem('fr_players', JSON.stringify(players)); localStorage.setItem('fr_activeP', activeP); } catch(e){} }
@@ -115,7 +115,7 @@ function renderPlayers(){
     const d=document.createElement('div'); d.className='pcard'+(i===activeP?' sel':'');
     const av = pl.photo ? `style="background-image:url(${pl.photo})"` : '';
     d.innerHTML = `<div class="edit">✎</div><div class="av" ${av}>${pl.photo?'':CHAR_COLORS[pl.char||0].emoji}</div>
-      <div class="pn">${pl.admin?'🛡 ':''}${pl.name}</div><div class="pa">${pl.pending?'⏳ pending · ':''}${pl.age?('age '+pl.age+' · '):''}${DIFFS[pl.diff!==undefined?pl.diff:1].name.split(' ')[0]}</div>`;
+      <div class="pn">${pl.admin?'🛡 ':''}${pl.name}</div><div class="pa">${pl.age?('age '+pl.age+' · '):''}${DIFFS[pl.diff!==undefined?pl.diff:1].name.split(' ')[0]}</div>`;
     d.onclick = (ev)=>{
       if(ev.target.classList.contains('edit')){ openEditor(i); return; }
       activeP=i; savePlayers(); applyPlayer(); renderPlayers();
@@ -125,7 +125,7 @@ function renderPlayers(){
   if(!loggedIn && players.length<4){
     const add=document.createElement('div'); add.className='pcard';
     add.innerHTML='<div class="av">＋</div><div class="pn">Add</div><div class="pa">new player</div>';
-    add.onclick=()=>{ players.push({name:'Player'+(players.length+1), age:'', photo:'', char:0, diff:1, pwd:'password', admin:false, pending:false}); activeP=players.length-1; savePlayers(); renderPlayers(); openEditor(activeP); };
+    add.onclick=()=>{ players.push({name:'Player'+(players.length+1), age:'', photo:'', char:0, diff:1, pwd:'password', admin:false}); activeP=players.length-1; savePlayers(); renderPlayers(); openEditor(activeP); };
     $('players').appendChild(add);
   }
   if(loggedIn){
@@ -197,8 +197,8 @@ DIFFS.forEach((d,i)=>{
   b.onclick=()=>{ diffIx=i; [...$('diffs').children].forEach((x,j)=>x.style.borderColor = j===i?'#ffe93b':'rgba(255,255,255,.25)'); };
   $('diffs').appendChild(b);
 });
-if(!players.some(p=>p.name.toLowerCase()==='mate')) { players.push({name:'Mate', age:'', photo:'', char:5, diff:1, pwd:'password', admin:false, pending:false}); }
-savePlayers();   // persist WAVE2 migration (pwd/admin/pending) even for stored profiles
+if(!players.some(p=>p.name.toLowerCase()==='mate')) { players.push({name:'Mate', age:'', photo:'', char:5, diff:1, pwd:'password', admin:false}); }
+savePlayers();   // persist WAVE2 migration (pwd/admin) even for stored profiles
 try{
   if(!localStorage.getItem('fr_pwreset1')){
     const mk=players.find(p=>p.name.trim().toLowerCase()==='mika');
@@ -238,12 +238,6 @@ function tryLogin(){
     return;
   }
   const pl=players[ix];
-  if(pl.pending){
-    loginTries++;
-    $('loginErr').textContent='⏳ Your profile awaits approval by the Admin';
-    const box=$('loginBox'); box.style.animation='none'; void box.offsetWidth; box.style.animation='shake .4s';
-    return;
-  }
   if($('loginPw').value===(pl.pwd||'password')){
     loginSel=ix;
     completeLogin();
@@ -263,10 +257,10 @@ renderLogin();
 (function(){
   let saved=null; try{ saved=localStorage.getItem('fr_login'); }catch(e){}
   const ix = saved!=null ? players.findIndex(p=>p.name===saved) : -1;
-  if(ix>=0 && !players[ix].pending){ loginSel=ix; completeLogin(); }
+  if(ix>=0){ loginSel=ix; completeLogin(); }
 })();
 
-// ---------- WAVE2: create-profile signup (pending until an admin approves) ----------
+// ---------- WAVE2: create-profile signup ----------
 let suChar=0;
 (function(){
   CHAR_COLORS.forEach((c,ci)=>{
@@ -286,35 +280,17 @@ let suChar=0;
     if(!nm){ $('suErr').textContent='❌ You need a name, recruit.'; return; }
     if(players.some(p=>p.name.trim().toLowerCase()===nm.toLowerCase())){ $('suErr').textContent='❌ That soldier already exists. Log in instead.'; return; }
     players.push({ name:nm.slice(0,14), age:$('suAge').value?parseInt($('suAge').value):'', photo:'', char:suChar, diff:1,
-      pwd:$('suPw').value||'password', admin:false, pending:true });
+      pwd:$('suPw').value||'password', admin:false });
     savePlayers(); renderPlayers();
     $('suForm').style.display='none'; $('suDone').style.display='block';
   };
 })();
 
-// ---------- WAVE2: admin panel + approval queue + invite links ----------
+// ---------- WAVE2: admin panel + invite links ----------
 function isAdmin(){ return loggedIn && players[activeP] && !!players[activeP].admin; }
 function updateAdminBtn(){
   $('adminBtn').style.display = isAdmin() ? 'inline-block' : 'none';
-  const nPending = players.filter(p=>p.pending).length;
-  const ab=$('approvalsBtn');
-  ab.style.display = isAdmin() ? 'inline-block' : 'none';
-  ab.textContent = nPending ? `✅ APPROVALS (${nPending})` : '✅ APPROVALS';
 }
-function renderApprovals(){
-  const L=$('approvalsList'); L.innerHTML='';
-  const pending = players.map((p,i)=>({p,i})).filter(x=>x.p.pending);
-  if(!pending.length){ L.innerHTML='<div style="opacity:.6; font-size:13px;">No one is waiting — you\'re all caught up.</div>'; return; }
-  pending.forEach(({p,i})=>{
-    const d=document.createElement('div');
-    d.style.cssText='display:flex; align-items:center; gap:10px; padding:9px 10px; margin:6px 0; background:rgba(124,252,0,.08); border:2px solid rgba(124,252,0,.4); border-radius:12px;';
-    d.innerHTML = `<span style="font-size:22px;">${CHAR_COLORS[p.char||0].emoji}</span>
-      <b style="flex:1;">${p.name}</b>
-      <button onclick="admAct('approve',${i}); renderApprovals();" style="padding:6px 14px; border:none; border-radius:8px; background:#2e8b3a; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✅ APPROVE</button>`;
-    L.appendChild(d);
-  });
-}
-$('approvalsBtn').onclick=()=>{ if(!isAdmin()) return; renderApprovals(); $('approvalsOverlay').style.display='flex'; };
 function inviteURL(p){
   return location.origin + '/#invite=' + btoa(encodeURIComponent(JSON.stringify({n:p.name, p:p.pwd||'password', c:p.char||0})));
 }
@@ -338,11 +314,10 @@ function renderAdmin(){
   const btn=(label,act,i,col)=>`<button onclick="admAct('${act}',${i})" style="padding:4px 9px; border:none; border-radius:7px; background:${col||'#3a2a75'}; color:#fff; font-weight:800; font-size:11px; cursor:pointer; font-family:inherit;">${label}</button>`;
   players.forEach((p,i)=>{
     const d=document.createElement('div');
-    d.style.cssText='display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:9px 10px; margin:6px 0; background:rgba(255,255,255,.05); border:2px solid '+(p.pending?'rgba(255,180,0,.7)':'rgba(255,255,255,.15)')+'; border-radius:12px;';
+    d.style.cssText='display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:9px 10px; margin:6px 0; background:rgba(255,255,255,.05); border:2px solid rgba(255,255,255,.15); border-radius:12px;';
     d.innerHTML = `<span style="font-size:22px;">${CHAR_COLORS[p.char||0].emoji}</span>
       <b style="min-width:86px;">${p.name}</b>
-      <span style="font-size:11px; color:#9f95d6; flex:1;">${p.admin?'🛡 admin ':''}${p.pending?'⏳ awaiting approval':''}</span>
-      ${p.pending?btn('✅ APPROVE','approve',i,'#2e8b3a'):''}
+      <span style="font-size:11px; color:#9f95d6; flex:1;">${p.admin?'🛡 admin ':''}</span>
       ${btn('✏ RENAME','rename',i)}
       ${btn('🔑 SET PW','pwd',i)}
       ${btn(p.admin?'🛡 REVOKE':'🛡 MAKE ADMIN','admin',i)}
@@ -383,8 +358,7 @@ window.saveLab=()=>{
 window.resetLab=()=>{ if(!isAdmin()) return; bossCfg={}; saveBossCfg(); renderLab(); cheatToast('🧪 STROYER LAB RESET TO FACTORY'); };
 window.admAct=(act,i)=>{
   const p=players[i]; if(!p||!isAdmin()) return;
-  if(act==='approve'){ p.pending=false; cheatToast('✅ '+p.name.toUpperCase()+' APPROVED — WELCOME TO THE ISLAND'); }
-  else if(act==='rename'){ const n=prompt('New name for '+p.name+':', p.name); if(n&&n.trim()){ p.name=n.trim().slice(0,14); if(i===activeP) persistLogin(); } }
+  if(act==='rename'){ const n=prompt('New name for '+p.name+':', p.name); if(n&&n.trim()){ p.name=n.trim().slice(0,14); if(i===activeP) persistLogin(); } }
   else if(act==='pwd'){ const n=prompt('New password for '+p.name+':', p.pwd||'password'); if(n!=null&&n!=='') p.pwd=n; }
   else if(act==='admin'){ p.admin=!p.admin; }
   else if(act==='del'){
@@ -405,14 +379,14 @@ $('admNew').onclick=()=>{
   const nm=n.trim().slice(0,14);
   let ix=players.findIndex(p=>p.name.trim().toLowerCase()===nm.toLowerCase());
   if(ix<0){
-    players.push({name:nm, age:'', photo:'', char:(Math.random()*CHAR_COLORS.length)|0, diff:1, pwd:'password', admin:false, pending:false});
+    players.push({name:nm, age:'', photo:'', char:(Math.random()*CHAR_COLORS.length)|0, diff:1, pwd:'password', admin:false});
     ix=players.length-1;
     savePlayers(); renderAdmin(); renderPlayers();
   }
-  showInvite(ix);   // invites are pre-approved by definition
+  showInvite(ix);
 };
 
-// ---------- WAVE2: #invite= links — pre-approved profile, straight into the lobby ----------
+// ---------- WAVE2: #invite= links — instant profile, straight into the lobby ----------
 (function(){
   const m=(location.hash||'').match(/^#invite=(.+)/); if(!m) return;
   let d=null;
@@ -423,9 +397,9 @@ $('admNew').onclick=()=>{
   let ix=players.findIndex(p=>p.name.trim().toLowerCase()===nm.trim().toLowerCase());
   if(ix<0){
     players.push({ name:nm, age:'', photo:'', char:clamp(parseInt(d.c)||0,0,CHAR_COLORS.length-1), diff:1,
-      pwd:String(d.p||'password'), admin:false, pending:false });   // invites are pre-approved
+      pwd:String(d.p||'password'), admin:false });
     ix=players.length-1;
-  } else players[ix].pending=false;
+  }
   savePlayers();
   loginSel=ix; completeLogin();
   setTimeout(()=>cheatToast('🎉 WELCOME TO THE ISLAND, '+nm.toUpperCase()+'!'), 400);   // deferred: cheatToast state initialises later in this file

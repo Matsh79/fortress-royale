@@ -162,7 +162,7 @@ html, body { overscroll-behavior:none; }
   </div>
   <div id="signupBox" style="display:none; background:#1a0f3d; border:3px solid #ffb400; border-radius:18px; padding:24px 30px; width:min(420px,92vw); text-align:center; color:#e8e2ff;">
     <div style="font-weight:900; font-size:22px; color:#ffe93b;">📝 NEW RECRUIT</div>
-    <div style="font-size:12px; opacity:.7; margin-bottom:12px;">SIGN UP — AN ADMIN MUST APPROVE YOU</div>
+    <div style="font-size:12px; opacity:.7; margin-bottom:12px;">SIGN UP — JOIN THE ISLAND INSTANTLY</div>
     <div id="suForm">
       <input id="suName" maxlength="14" placeholder="your first name" autocomplete="off" style="width:80%; margin-bottom:8px; padding:10px 14px; border-radius:10px; border:2px solid rgba(255,180,0,.5); background:rgba(10,5,35,.7); color:#fff; font-size:15px; text-align:center; outline:none;">
       <input id="suAge" type="number" min="3" max="99" placeholder="age (optional)" style="width:80%; margin-bottom:8px; padding:10px 14px; border-radius:10px; border:2px solid rgba(255,180,0,.5); background:rgba(10,5,35,.7); color:#fff; font-size:15px; text-align:center; outline:none;">
@@ -172,14 +172,14 @@ html, body { overscroll-behavior:none; }
       <div id="suErr" style="color:#ff8a8a; font-weight:800; font-size:13px; min-height:18px; margin-top:6px;"></div>
       <button id="suGo" style="margin-top:4px; padding:10px 34px; border:none; border-radius:10px; background:#ffb400; font-weight:900; font-size:16px; cursor:pointer;">CREATE PROFILE</button>
     </div>
-    <div id="suDone" style="display:none; font-weight:800; color:#ffe27a; font-size:16px; margin:16px 0;">⏳ Waiting for Mika's approval<br><small style="opacity:.6; font-weight:400; font-size:12px;">An admin must approve you in the 🛡 ADMIN panel before you can play</small></div>
+    <div id="suDone" style="display:none; font-weight:800; color:#ffe27a; font-size:16px; margin:16px 0;">✅ Account created!<br><small style="opacity:.6; font-weight:400; font-size:12px;">Log in with your name and password to play</small></div>
     <div><button id="suBack" style="background:none; border:none; color:#9f95d6; font-size:12px; font-weight:700; cursor:pointer; text-decoration:underline; font-family:inherit; margin-top:10px;">← back to login</button></div>
   </div>
 </div>
 <div id="adminOverlay" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:46; background:rgba(10,5,35,.9);">
   <div style="background:#1a0f3d; border:3px solid #ffb400; border-radius:18px; padding:24px 28px; width:min(580px,94vw); max-height:88vh; overflow-y:auto; color:#e8e2ff;">
     <div style="font-weight:900; font-size:22px; color:#ffe93b;">🛡 ADMIN PANEL</div>
-    <div style="font-size:12px; opacity:.6; margin-bottom:12px;">approve recruits · manage soldiers · send invite links</div>
+    <div style="font-size:12px; opacity:.6; margin-bottom:12px;">manage soldiers · send invite links</div>
     <div id="adminList"></div>
     <button id="admNew" style="margin-top:10px; padding:9px 18px; border:none; border-radius:10px; background:linear-gradient(180deg,#ffe93b,#ffb400); color:#4a2d00; font-weight:900; font-size:13px; cursor:pointer; font-family:inherit;">➕ CREATE &amp; INVITE NEW PLAYER</button>
     <div id="invitePane" style="display:none; margin-top:12px; background:rgba(255,180,0,.08); border:2px solid rgba(255,180,0,.5); border-radius:12px; padding:12px;">
@@ -198,14 +198,6 @@ html, body { overscroll-behavior:none; }
       <button onclick="resetLab()" style="padding:8px 18px; border:none; border-radius:9px; background:#3a2a75; color:#fff; font-weight:900; font-size:12px; cursor:pointer; font-family:inherit;">↩ FACTORY RESET</button>
     </div>
     <button onclick="document.getElementById('adminOverlay').style.display='none'" style="margin-top:14px; padding:8px 22px; border:none; border-radius:10px; background:#ffb400; font-weight:800; cursor:pointer;">CLOSE</button>
-  </div>
-</div>
-<div id="approvalsOverlay" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:46; background:rgba(10,5,35,.9);">
-  <div style="background:#1a0f3d; border:3px solid #2e8b3a; border-radius:18px; padding:24px 28px; width:min(480px,94vw); max-height:88vh; overflow-y:auto; color:#e8e2ff;">
-    <div style="font-weight:900; font-size:22px; color:#7CFC00;">✅ PENDING APPROVALS</div>
-    <div style="font-size:12px; opacity:.6; margin-bottom:12px;">new recruits waiting to join the island</div>
-    <div id="approvalsList"></div>
-    <button onclick="document.getElementById('approvalsOverlay').style.display='none'" style="margin-top:14px; padding:8px 22px; border:none; border-radius:10px; background:#7CFC00; color:#123; font-weight:800; cursor:pointer;">CLOSE</button>
   </div>
 </div>
 <div id="lobby">
@@ -244,7 +236,6 @@ html, body { overscroll-behavior:none; }
     <div style="display:flex; gap:8px;">
       <button id="lbBtn" style="font-size:13px; font-weight:800; padding:8px 22px; border:2px solid rgba(255,255,255,.3); border-radius:10px; background:rgba(0,0,0,.25); color:#ffe27a; cursor:pointer;">🏆 LEADERBOARD</button>
       <button id="adminBtn" style="display:none; font-size:13px; font-weight:800; padding:8px 22px; border:2px solid rgba(255,180,0,.6); border-radius:10px; background:rgba(0,0,0,.25); color:#ffd34d; cursor:pointer; font-family:inherit;">🛡 ADMIN</button>
-      <button id="approvalsBtn" style="display:none; font-size:13px; font-weight:800; padding:8px 22px; border:2px solid rgba(46,139,58,.7); border-radius:10px; background:rgba(0,0,0,.25); color:#7CFC00; cursor:pointer; font-family:inherit;">✅ APPROVALS</button>
     </div>
     <div class="hint"><b>WASD</b> move &middot; <b>Mouse</b> look &middot; <b>Click</b> shoot &middot; <b>1/2/3</b> weapon slots · <b>E</b> chests / loot / karts / supply drops &middot; <b>R</b> reload &middot; <b>Shift</b> sprint &middot; <b>Space</b> jump<br>
     <b>Q</b> build wall &middot; <b>F</b> build ramp &middot; <b>V</b> dance &middot; <b>Right-mouse</b> sniper scope<br>
