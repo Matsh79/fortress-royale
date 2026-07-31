@@ -332,9 +332,6 @@ function renderAdmin(){
   });
 }
 const LAB_FIELDS={
-  alfie:[['hp','HP',600],['speed','Speed',8],['scale','Size',1.5],['dmg','Damage ×',0.55],['slime','Slime every (s)',2],['blanket','Blanket every (s)',8]],
-  kiara:[['hp','HP',900],['speed','Speed',10.5],['scale','Size',2],['dmg','Damage ×',1]],
-  mum:[['hp','HP',1400],['speed','Speed',6],['scale','Size',2.3],['dmg','Damage ×',1.4],['look','The Look every (s)',9],['heal','Heal every (s)',4]],
   dad:[['hp','HP',2000],['speed','Speed',9],['scale','Size',2.6],['dmg','Damage ×',2],['burst','Burst every (s)',6],['rocket','Rocket every (s)',5]],
 };
 function renderLab(){
@@ -2144,19 +2141,13 @@ function updateBossRockets(dt,now){
     if(Math.random()<.5) puffSmoke(r.m.position);
   }
 }
-// ---------- THE STROYER DYNASTY: Alfiestroyer → Kiarastroyer → Mumstroyer → Dr. Dadstroyer ----------
+// ---------- THE STROYER DYNASTY: Dr. Dadstroyer ----------
 let bossSpawned=false, bossRef=null;
 const STROYERS={
-  alfie:{ name:'ALFIESTROYER', title:'👶 ALFIESTROYER — mighty baby, giant dummy, slime', scale:1.5, hp:1300, speed:8,
-          tier:{col:0xffb6c1, acc:1.05, dmg:.55, cd:.16}, col:0xff8fb3, torso:0xffb6c1, chute:0x7cd7ff, bonus:15 },
-  kiara:{ name:'KIARASTROYER', title:'💅 KIARASTROYER — settling things old school', scale:2.0, hp:900, speed:10.5,
-          tier:{col:0xff5ee0, acc:1, dmg:1, cd:.55}, col:0xff5ee0, torso:0x8f1360, chute:0xff5ee0, bonus:20, melee:true },
-  mum:  { name:'MUMSTROYER', title:'👁 MUMSTROYER — she has The Look', scale:2.3, hp:1400, speed:6,
-          tier:{col:0x2a9d8f, acc:1.25, dmg:1.4, cd:.8}, col:0x2a9d8f, torso:0x14544b, chute:0x2a9d8f, bonus:25, mum:true },
   dad:  { name:'DR. DADSTROYER', title:'☠ DR. DADSTROYER', scale:2.6, hp:2000, speed:9,
           tier:{col:0x2a1035, acc:1.15, dmg:2, cd:.6}, col:0x6b21a8, torso:0x2a1035, chute:0x9b30ff, bonus:40, dad:true },
 };
-const stroyerState={ alfie:null, kiara:null, mum:null, kiaraDelay:0, mumDelay:0 };
+const stroyerState={};
 let bossCfg={}; try{ bossCfg=JSON.parse(localStorage.getItem('fr_bosscfg'))||{}; }catch(e){}
 function bcfg(key,field,def){ const o=bossCfg[key]; const v=o&&o[field]; return (v===undefined||v===null||v==='')?def:Number(v); }
 function saveBossCfg(){ try{ localStorage.setItem('fr_bosscfg', JSON.stringify(bossCfg)); }catch(e){} }
@@ -2250,19 +2241,9 @@ function updateBlankets(dt){
   }
 }
 function spawnBoss(){ spawnStroyer('dad'); }
-// director: Alfie at 45s → Kiara 4s after Alfie falls → Mum 25s after Kiara falls → Dad at phase-2 (storm trigger)
+// director: Dad drops at phase-2 (storm trigger)
 function stroyerDirector(dt){
   if(!running||gameOver) return;
-  const elapsed=(performance.now()-startedAt)/1000;
-  if(!stroyerState.alfie && elapsed>=45){ if(bcfg('alfie','off',0)===1) stroyerState.alfie={alive:false}; else stroyerState.alfie=spawnStroyer('alfie'); }
-  if(stroyerState.alfie && !stroyerState.alfie.alive && !stroyerState.kiara){
-    stroyerState.kiaraDelay+=dt;
-    if(stroyerState.kiaraDelay>=4){ if(bcfg('kiara','off',0)===1) stroyerState.kiara={alive:false}; else stroyerState.kiara=spawnStroyer('kiara'); }
-  }
-  if(stroyerState.kiara && !stroyerState.kiara.alive && !stroyerState.mum){
-    stroyerState.mumDelay+=dt;
-    if(stroyerState.mumDelay>=25){ if(bcfg('mum','off',0)===1) stroyerState.mum={alive:false}; else stroyerState.mum=spawnStroyer('mum'); }
-  }
   if(player.slowT>0) player.slowT-=dt;
   if(player.slimeT>0) player.slimeT-=dt;
   updateSlimes(dt);
@@ -2274,9 +2255,7 @@ function updateBossBar(){
     // pre-arrival countdown: time until phase-2 shrink begins
     if(running && !gameOver){
       let eta=0, label='';
-      const elapsed=(performance.now()-startedAt)/1000;
-      if(!stroyerState.alfie && bcfg('alfie','off',0)!==1){ eta=45-elapsed; label='👶 ALFIESTROYER'; }
-      else if(!bossSpawned && bcfg('dad','off',0)!==1){
+      if(!bossSpawned && bcfg('dad','off',0)!==1){
         label='☠ DADSTROYER';
         if(phaseIx===0) eta = (shrinking ? (stormR-100)/(stormPhases[0].rate*10) : phaseTimer + (stormR-100)/(stormPhases[0].rate*10) + stormPhases[1].wait)
                           + (shrinking ? stormPhases[1].wait : 0);
