@@ -1963,6 +1963,18 @@ function updateAlive(){
 // ---------- bot AI ----------
 let D = DIFFS[1];
 const UP_Y = new THREE.Vector3(0,1,0);
+// Destruction Demon: smashes through any obstacle blocking its path instead of colliding with it
+function bossSmash(b){
+  const r=1.6;
+  for(let i=obstacles.length-1;i>=0;i--){
+    const o=obstacles[i];
+    if(b.mesh.position.x>o.min.x-r && b.mesh.position.x<o.max.x+r && b.mesh.position.z>o.min.z-r && b.mesh.position.z<o.max.z+r){
+      voxelBurst({x:(o.min.x+o.max.x)/2, z:(o.min.z+o.max.z)/2}, 0x9a9a9a, 0x6a6a6a);
+      scene.remove(o.mesh);
+      obstacles.splice(i,1);
+    }
+  }
+}
 function botThink(b,dt,now){
   if(!b.alive) return;
   if(b.dropping){   // boss parachute descent
@@ -2004,7 +2016,9 @@ function botThink(b,dt,now){
       const perp=new THREE.Vector3(-dir.z,0,dir.x).multiplyScalar(.5*b.strafeDir); dir.add(perp).normalize(); }
     const spd=b.speed*(stormPanic?1.35:1);
     const np=b.mesh.position.clone().add(dir.clone().multiplyScalar(spd*dt));
-    if(!collides(np,.6)){ b.mesh.position.copy(np); b.moving=true; }
+    if(b.stroyer==='dad' && Math.hypot(np.x,np.z)<=MAP+4){
+      bossSmash(b); b.mesh.position.copy(np); b.moving=true;
+    } else if(!collides(np,.6)){ b.mesh.position.copy(np); b.moving=true; }
     else {
       // wall-slide: try ±55° so bots don't pile up dead against towers
       for(const ang of [0.96,-0.96]){
@@ -2114,7 +2128,7 @@ function bossRocket(b){
   m.position.copy(from); scene.add(m);
   bossRockets.push({m,ring,from,to,t:0,dur:1.8});
   sfx('rocket');
-  feed('☄ <b>DR. DADSTROYER</b> fired a rocket — DODGE!');
+  feed('☄ <b>DESTRUCTION DEMON</b> fired a rocket — DODGE!');
 }
 function updateBossRockets(dt,now){
   for(let i=bossRockets.length-1;i>=0;i--){
@@ -2122,7 +2136,7 @@ function updateBossRockets(dt,now){
     const k=r.t/r.dur;
     r.ring.material.opacity=.35+.35*(.5+.5*Math.sin(now/80));
     if(k>=1){
-      explode(r.to.clone().setY(.5), 1, 'DR. DADSTROYER');
+      explode(r.to.clone().setY(.5), 1, 'DESTRUCTION DEMON');
       scene.remove(r.m); scene.remove(r.ring);
       r.ring.geometry.dispose(); r.ring.material.dispose();
       bossRockets.splice(i,1); continue;
@@ -2133,10 +2147,10 @@ function updateBossRockets(dt,now){
     if(Math.random()<.5) puffSmoke(r.m.position);
   }
 }
-// ---------- THE STROYER DYNASTY: Dr. Dadstroyer ----------
+// ---------- THE STROYER DYNASTY: Destruction Demon ----------
 let bossSpawned=false, bossRef=null;
 const STROYERS={
-  dad:  { name:'DR. DADSTROYER', title:'☠ DR. DADSTROYER', scale:2.6, hp:2000, speed:9,
+  dad:  { name:'DESTRUCTION DEMON', title:'☠ DESTRUCTION DEMON', scale:2.6, hp:2000, speed:9,
           tier:{col:0x2a1035, acc:1.15, dmg:2, cd:.6}, col:0x6b21a8, torso:0x2a1035, chute:0x9b30ff, bonus:40, dad:true },
 };
 const stroyerState={};
@@ -2248,7 +2262,7 @@ function updateBossBar(){
     if(running && !gameOver){
       let eta=0, label='';
       if(!bossSpawned && bcfg('dad','off',0)!==1){
-        label='☠ DADSTROYER';
+        label='☠ DESTRUCTION DEMON';
         if(phaseIx===0) eta = (shrinking ? (stormR-100)/(stormPhases[0].rate*10) : phaseTimer + (stormR-100)/(stormPhases[0].rate*10) + stormPhases[1].wait)
                           + (shrinking ? stormPhases[1].wait : 0);
         else if(phaseIx===1 && !shrinking) eta = phaseTimer;
