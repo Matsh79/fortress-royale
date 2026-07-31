@@ -553,19 +553,48 @@ foam.rotation.x=-Math.PI/2; foam.position.y=-.88; scene.add(foam);
 const palette=[0xd9822b,0xc8b28e,0x9a9a9a,0xb0653a];
 for(let i=0;i<26;i++){ const s=rand(2.4,4.2); box(s,s,s, rand(-MAP*.75,MAP*.75), s/2, rand(-MAP*.75,MAP*.75), palette[i%4], rand(0,Math.PI), crateTex); }
 for(let i=0;i<10;i++){ box(rand(10,18), rand(3.5,6), 1.6, rand(-MAP*.7,MAP*.7), 2.2, rand(-MAP*.7,MAP*.7), 0xcfcabc, rand(0,Math.PI)); }
+const houseWinMat = new THREE.MeshBasicMaterial({color:0x0a0a14});
 for(let i=0;i<6;i++){
   const x=rand(-MAP*.6,MAP*.6), z=rand(-MAP*.6,MAP*.6), c=[0xf2a24b,0x8fd3f4,0xf47c7c,0xb69cf4][i%4];
-  box(10,6,10,x,3,z,c);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(8.2,4,4), toonMat({color:0x8a4b2d}));
-  roof.position.set(x,8,z); roof.rotation.y=Math.PI/4; roof.castShadow=true; scene.add(roof);
+  const W=rand(9,11.5), D=rand(9,11.5), H=rand(5,6.6);
+  box(W,H,D,x,H/2,z,c);
+  const trim=new THREE.Mesh(new THREE.BoxGeometry(W+.4,.4,D+.4), toonMat({color:0x5a4a3a}));
+  trim.position.set(x,.2,z); scene.add(trim);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(W,D)*.82,4,4), toonMat({color:0x8a4b2d}));
+  roof.position.set(x,H+2,z); roof.rotation.y=Math.PI/4; roof.castShadow=true; scene.add(roof);
+  const door=new THREE.Mesh(new THREE.BoxGeometry(1.8,3.2,.15), toonMat({color:0x4a3520}));
+  door.position.set(x, 1.6, z+D/2+.08); scene.add(door);
+  const winL=new THREE.Mesh(new THREE.BoxGeometry(.12,1.3,1.3), houseWinMat);
+  winL.position.set(x-W/2-.06, H*.55, z+D*.16); scene.add(winL);
+  const winR=new THREE.Mesh(new THREE.BoxGeometry(.12,1.3,1.3), houseWinMat);
+  winR.position.set(x+W/2+.06, H*.55, z+D*.16); scene.add(winR);
 }
+// bark: vertical grain over brown, tiled around the trunk
+const barkTex = (()=>{
+  const cv=texCanvas(32), cx=cv.getContext('2d');
+  cx.fillStyle='#8a5a2d'; cx.fillRect(0,0,32,32);
+  cx.strokeStyle='rgba(0,0,0,.22)'; cx.lineWidth=1;
+  for(let x=0;x<32;x+=3){ cx.beginPath(); cx.moveTo(x+rand(-1,1),0); cx.lineTo(x+rand(-1,1),32); cx.stroke(); }
+  cx.strokeStyle='rgba(255,255,255,.12)';
+  for(let x=1.5;x<32;x+=3){ cx.beginPath(); cx.moveTo(x,0); cx.lineTo(x,32); cx.stroke(); }
+  const t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(3,2);
+  return t;
+})();
+const barkMat = toonMat({color:0xffffff, map:barkTex});
 const trees=[];
 for(let i=0;i<40;i++){
   const x=rand(-MAP*.9,MAP*.9), z=rand(-MAP*.9,MAP*.9);
-  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.4,.6,rand(3,5),6), toonMat({color:0x8a5a2d}));
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.4,.6,rand(3,5),6), barkMat);
   trunk.position.set(x,2,z); trunk.castShadow=true;
-  const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(rand(1.8,3.2),0), toonMat({color:i%3?0x3fae4f:0x7CFC00}));
-  crown.position.set(x,trunk.geometry.parameters.height+2.4,z); crown.castShadow=true;
+  const crown=new THREE.Group();
+  const leafHex=i%3?0x3fae4f:0x7CFC00;
+  for(let k=0;k<3;k++){
+    const blob=new THREE.Mesh(new THREE.IcosahedronGeometry(rand(1.4,2.4),0), toonMat({color:new THREE.Color(leafHex).offsetHSL(0,0,rand(-.06,.06))}));
+    blob.position.set(rand(-.9,.9), rand(-.4,.6), rand(-.9,.9));
+    blob.castShadow=true; crown.add(blob);
+  }
+  crown.position.set(x,trunk.geometry.parameters.height+2.4,z);
   scene.add(trunk,crown);
   trees.push({trunk,crown,x,z,hp:3,alive:true});
 }
@@ -838,6 +867,23 @@ function gmat(color, emissive, ei){
   if(!gunMatCache[k]) gunMatCache[k] = toonMat(emissive!==undefined ? {color,emissive,emissiveIntensity:ei||.5} : {color});
   return gunMatCache[k];
 }
+// brushed metal: horizontal streak noise, tinted per part via material.color — shared texture, cached per color
+const metalTex = (()=>{
+  const cv=texCanvas(32), cx=cv.getContext('2d');
+  cx.fillStyle='#ffffff'; cx.fillRect(0,0,32,32);
+  cx.strokeStyle='rgba(0,0,0,.10)'; cx.lineWidth=1;
+  for(let y=0;y<32;y+=1.5){ cx.beginPath(); cx.moveTo(0,y); cx.lineTo(32,y); cx.stroke(); }
+  cx.strokeStyle='rgba(255,255,255,.14)';
+  for(let y=.75;y<32;y+=1.5){ cx.beginPath(); cx.moveTo(0,y); cx.lineTo(32,y); cx.stroke(); }
+  const t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,1);
+  return t;
+})();
+const gunMetalMatCache = {};
+function gmatMetal(color){
+  if(!gunMetalMatCache[color]) gunMetalMatCache[color] = toonMat({color, map:metalTex});
+  return gunMetalMatCache[color];
+}
 const GC = { metal:0x3d4453, dark:0x23272f, black:0x16181d, polymer:0x2b2f38, wood:0x9c6435, woodDark:0x74471f,
              steel:0xb8c4cf, silver:0xd7dee6, green:0x3d5c38, greenDark:0x2b4227, olive:0x4a4458 };
 // gun-local coords: -Z = muzzle direction, +Y = up
@@ -853,7 +899,7 @@ function buildGunModel(key, world){
   const g = new THREE.Group();
   const M=gmat, B=G_BOX;
   if(key==='knife'){
-    part(g,B,M(GC.steel), .022,.09,.40, 0,.02,-.30);                       // blade
+    part(g,B,gmatMetal(GC.steel), .022,.09,.40, 0,.02,-.30);               // blade
     part(g,G_CONE,M(GC.steel), .022,.10,.09, 0,.02,-.55, -Math.PI/2);      // tip
     part(g,B,M(GC.dark), .10,.024,.03, 0,.02,-.09);                        // guard
     part(g,B,M(0x3a2c22), .036,.075,.16, 0,0,.01);                         // handle
@@ -861,7 +907,7 @@ function buildGunModel(key, world){
   } else if(key==='chainsaw'){
     part(g,B,M(0xd93b1f), .12,.14,.24, 0,.02,-.02);                        // engine body
     part(g,B,M(GC.dark), .05,.05,.06, .05,.10,-.02);                       // exhaust stub
-    part(g,B,M(GC.steel), .022,.09,.52, 0,.02,-.40);                       // blade bar
+    part(g,B,gmatMetal(GC.steel), .022,.09,.52, 0,.02,-.40);               // blade bar
     for(let i=0;i<5;i++){                                                  // teeth top+bottom
       part(g,B,M(GC.dark), .026,.02,.045, 0,.075,-.20-i*.09);
       part(g,B,M(GC.dark), .026,.02,.045, 0,-.035,-.20-i*.09);
@@ -873,9 +919,9 @@ function buildGunModel(key, world){
     }
     g.userData.chainsaw=true;
   } else if(key==='deagle'){
-    part(g,B,M(0x9aa7b5), .055,.075,.30, 0,.075,-.14);                     // tall slide
+    part(g,B,gmatMetal(0x9aa7b5), .055,.075,.30, 0,.075,-.14);              // tall slide
     part(g,B,M(GC.dark), .05,.05,.26, 0,.012,-.12);                        // frame
-    tube(g,M(GC.dark), .045,.07, 0,.078,-.31);                             // short exposed barrel
+    tube(g,gmatMetal(GC.dark), .045,.07, 0,.078,-.31);                     // short exposed barrel
     part(g,B,M(GC.polymer), .048,.16,.075, 0,-.08,.02, .28);               // grip
     part(g,B,M(GC.dark), .04,.014,.09, 0,-.035,-.06);                      // trigger guard
     if(!world){
@@ -885,11 +931,12 @@ function buildGunModel(key, world){
     }
     g.userData.muzzle={y:.078,z:-.37};
   } else if(key==='rifle'){ // AK-47: gunmetal + wood, curved mag
-    part(g,B,M(0x2f3542), .07,.085,.34, 0,0,-.05);                         // receiver
+    part(g,B,gmatMetal(0x2f3542), .07,.085,.34, 0,0,-.05);                  // receiver
     part(g,B,M(GC.wood), .075,.06,.18, 0,-.005,-.30);                      // lower handguard
     part(g,B,M(GC.wood), .06,.045,.15, 0,.058,-.29);                       // upper handguard / gas tube
-    tube(g,M(GC.dark), .035,.28, 0,.012,-.52);                             // barrel
-    tube(g,M(GC.metal), .046,.07, 0,.012,-.66);                            // muzzle brake
+    part(g,B,gmatMetal(GC.metal), .05,.03,.05, 0,.058,-.36);               // gas block
+    tube(g,gmatMetal(GC.dark), .035,.28, 0,.012,-.52);                     // barrel
+    tube(g,gmatMetal(GC.metal), .046,.07, 0,.012,-.66);                    // muzzle brake
     part(g,B,M(GC.wood), .055,.09,.22, 0,-.03,.22, .12);                   // stock
     part(g,B,M(GC.woodDark), .042,.10,.05, 0,-.09,.06, .35);               // pistol grip
     part(g,B,M(GC.dark), .046,.095,.06, 0,-.10,-.10, .3);                  // curved mag seg 1
@@ -901,11 +948,12 @@ function buildGunModel(key, world){
     }
     g.userData.muzzle={y:.012,z:-.70};
   } else if(key==='m4'){ // M4A4: railed, straight-ish mag, buffer-tube stock
-    part(g,B,M(0x36454f), .065,.08,.30, 0,0,-.02);                         // receiver
+    part(g,B,gmatMetal(0x36454f), .065,.08,.30, 0,0,-.02);                  // receiver
     part(g,B,M(GC.black), .05,.024,.28, 0,.055,-.05);                      // top rail
     tube(g,M(GC.polymer), .07,.24, 0,.005,-.31);                           // handguard
-    tube(g,M(GC.dark), .03,.20, 0,.005,-.53);                              // barrel
-    tube(g,M(GC.black), .04,.07, 0,.005,-.64);                             // flash hider
+    part(g,B,M(GC.black), .025,.03,.05, 0,-.028,-.24);                     // foregrip nub
+    tube(g,gmatMetal(GC.dark), .03,.20, 0,.005,-.53);                      // barrel
+    tube(g,gmatMetal(GC.black), .04,.07, 0,.005,-.64);                     // flash hider
     tube(g,M(GC.dark), .045,.13, 0,.03,.17);                               // buffer tube
     part(g,B,M(GC.polymer), .055,.095,.13, 0,-.002,.28);                   // stock
     part(g,B,M(GC.polymer), .042,.10,.05, 0,-.085,.08, .35);               // pistol grip
@@ -917,9 +965,9 @@ function buildGunModel(key, world){
     }
     g.userData.muzzle={y:.005,z:-.68};
   } else if(key==='smg'){ // MP5: slim, short, curved mag
-    part(g,B,M(GC.black), .055,.07,.26, 0,0,-.04);                         // receiver
+    part(g,B,gmatMetal(GC.black), .055,.07,.26, 0,0,-.04);                 // receiver
     part(g,B,M(GC.polymer), .05,.06,.13, 0,-.005,-.22);                    // slim handguard
-    tube(g,M(GC.dark), .026,.14, 0,.012,-.35);                             // barrel
+    tube(g,gmatMetal(GC.dark), .026,.14, 0,.012,-.35);                     // barrel
     tube(g,M(GC.black), .034,.045, 0,.012,-.42);                           // tri-lug muzzle
     part(g,B,M(GC.polymer), .042,.09,.05, 0,-.075,.05, .3);                // grip
     part(g,B,M(GC.dark), .045,.045,.13, 0,.012,.15);                       // stock strut
@@ -933,8 +981,9 @@ function buildGunModel(key, world){
     g.userData.muzzle={y:.012,z:-.45};
   } else if(key==='shotgun'){ // Nova: long barrel + tube mag + pump
     part(g,B,M(0x4a342a), .06,.08,.28, 0,0,-.03);                          // receiver
-    tube(g,M(GC.dark), .032,.42, 0,.038,-.38);                             // barrel
-    tube(g,M(GC.metal), .034,.34, 0,-.022,-.34);                           // mag tube under barrel
+    tube(g,gmatMetal(GC.dark), .032,.42, 0,.038,-.38);                     // barrel
+    tube(g,gmatMetal(GC.metal), .034,.34, 0,-.022,-.34);                   // mag tube under barrel
+    part(g,B,M(0x2a1c14), .015,.05,.10, .045,.01,-.15);                    // shell holder strip
     part(g,B,M(0x7a3b2e), .066,.062,.13, 0,-.02,-.28);                     // pump
     part(g,B,M(0x7a3b2e), .05,.09,.20, 0,-.025,.20, .12);                  // stock
     part(g,B,M(0x63302a), .045,.07,.06, 0,-.065,.09, .4);                  // grip wedge
@@ -947,8 +996,8 @@ function buildGunModel(key, world){
     part(g,B,M(GC.green), .06,.085,.46, 0,-.002,-.09);                     // chassis (long AWP forend)
     part(g,B,M(GC.green), .057,.11,.20, 0,-.02,.26, .1);                   // stock
     part(g,B,M(GC.greenDark), .05,.032,.12, 0,.048,.28);                   // cheek pad
-    tube(g,M(GC.dark), .035,.40, 0,.02,-.49);                              // long barrel
-    tube(g,M(GC.black), .048,.07, 0,.02,-.70);                             // muzzle brake
+    tube(g,gmatMetal(GC.dark), .035,.40, 0,.02,-.49);                      // long barrel
+    tube(g,gmatMetal(GC.black), .048,.07, 0,.02,-.70);                     // muzzle brake
     tube(g,M(GC.black), .045,.24, 0,.10,-.02);                             // scope tube
     tube(g,M(GC.black), .066,.07, 0,.10,-.16);                             // objective bell
     tube(g,M(GC.black), .056,.05, 0,.10,.11);                              // ocular
@@ -959,14 +1008,15 @@ function buildGunModel(key, world){
       part(g,B,M(GC.black), .016,.045,.03, 0,.055,-.06);                   // scope mount F
       part(g,B,M(GC.black), .016,.045,.03, 0,.055,.05);                    // scope mount R
       part(g,B,M(GC.steel), .05,.018,.018, .05,.005,.05, 0,0,-.5);         // bolt handle
-      part(g,G_CYL,M(GC.metal), .012,.15,.012, -.028,-.045,-.38, Math.PI/2-.3); // bipod leg L (folded)
-      part(g,G_CYL,M(GC.metal), .012,.15,.012, .028,-.045,-.38, Math.PI/2-.3);  // bipod leg R (folded)
+      part(g,G_CYL,gmatMetal(GC.metal), .012,.15,.012, -.028,-.045,-.38, Math.PI/2-.3); // bipod leg L (folded)
+      part(g,G_CYL,gmatMetal(GC.metal), .012,.15,.012, .028,-.045,-.38, Math.PI/2-.3);  // bipod leg R (folded)
     }
     g.userData.muzzle={y:.02,z:-.74};
   } else if(key==='rocket'){ // fat tube + visible cone warhead
-    tube(g,M(GC.olive), .13,.66, 0,.02,-.04);                              // main tube
+    tube(g,gmatMetal(GC.olive), .13,.66, 0,.02,-.04);                      // main tube
     part(g,G_CONE,M(GC.olive), .17,.14,.17, 0,.02,.34, -Math.PI/2);        // rear exhaust bell (flares rearward)
-    tube(g,M(GC.dark), .15,.04, 0,.02,-.37);                               // front ring
+    tube(g,gmatMetal(GC.dark), .15,.04, 0,.02,-.37);                       // front ring
+    part(g,B,M(GC.dark), .02,.02,.30, 0,.075,-.10);                        // top carry rail
     part(g,G_CONE,M(GC.greenDark), .11,.17,.11, 0,.02,-.47, -Math.PI/2);   // warhead cone
     part(g,B,M(0xff5522,0xff5522,.6), .026,.026,.026, 0,.02,-.56);         // warhead tip
     part(g,B,M(GC.polymer), .042,.10,.05, 0,-.08,.08, .3);                 // grip
@@ -1425,6 +1475,20 @@ const EYE=1.7, SPEED=10, SPRINT=14.5, GRAV=28, JUMP=9.5;
 const BOT_NAMES=['Iron Mate','The Incredible Sulk','Spider-Lad','Captain Cyprus','Bat-Dad','Wonder Wanda','Thorbjörn','Black Widower','Doctor Weird','Aqua-Fella','Hawk-Eyed Harry','Green Lantern Jim','Silver Sofer','Ant-Uncle','Star-Lawd','Groot Jr','Rocket Racoondog','Miss Marvellous','Deadpond','Wolverleen'];
 const bots=[];
 // shared bot part geometries (built once, reused by every bot)
+// ---------- clothing fabric: neutral woven texture, tinted per-tier via material.color ----------
+const fabricTex = (()=>{
+  const cv=texCanvas(64), cx=cv.getContext('2d');
+  cx.fillStyle='#d7d7d7'; cx.fillRect(0,0,64,64);
+  cx.strokeStyle='rgba(0,0,0,.08)'; cx.lineWidth=1;
+  for(let i=-64;i<128;i+=4){ cx.beginPath(); cx.moveTo(i,0); cx.lineTo(i-64,64); cx.stroke(); }
+  cx.strokeStyle='rgba(255,255,255,.10)';
+  for(let i=-62;i<128;i+=4){ cx.beginPath(); cx.moveTo(i,0); cx.lineTo(i-64,64); cx.stroke(); }
+  cx.fillStyle='rgba(0,0,0,.06)';
+  for(let i=0;i<300;i++) cx.fillRect(Math.random()*64,Math.random()*64,1,1);
+  const t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,2);
+  return t;
+})();
 const BOTGEO = {
   torso: new THREE.BoxGeometry(.8,1.05,.45),
   head:  new THREE.BoxGeometry(.55,.55,.55),
@@ -1434,7 +1498,7 @@ const BOTGEO = {
 };
 const SKIN_HEX = 0xffe0bd;
 const botSkinMat = toonMat({color:SKIN_HEX});
-const botPantsMat = toonMat({color:0x33334a});
+const botPantsMat = toonMat({color:0x33334a, map:fabricTex});
 const botHitMat = new THREE.MeshBasicMaterial({visible:false});   // raycastable, never drawn
 // 3 face variants drawn once on canvas (eyes + mouth on skin tone)
 const botFaceMats = [0,1,2].map(v=>{
@@ -1457,7 +1521,7 @@ function makeBot(name){
   const g=new THREE.Group();
   const tier=TIERS[pickTier()];
   const col=new THREE.Color(tier.col); col.offsetHSL(rand(-.02,.02),0,rand(-.07,.07));
-  const bodyMat=toonMat({color:col});
+  const bodyMat=toonMat({color:col, map:fabricTex});
   // torso (visual) + invisible full-body hitbox (b.body raycast target, matches old capsule coverage)
   const torso=new THREE.Mesh(BOTGEO.torso, bodyMat); torso.position.y=1.35; torso.castShadow=true;
   const hitbox=new THREE.Mesh(BOTGEO.hit, botHitMat); hitbox.position.y=.97;
@@ -2177,19 +2241,27 @@ function spawnStroyer(key){
   b.tagTex=new THREE.CanvasTexture(b.tagCv);
   b.tag.material=new THREE.SpriteMaterial({map:b.tagTex, transparent:true});
   b.tag.scale.set(4,.75,1); b.tag.position.y=3.35; b.hpShown=-1;
-  if(key==='alfie'){
-    const dummy=new THREE.Group();
-    const shield=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.12,14), toonMat({color:0xff8fb3}));
-    shield.rotation.x=Math.PI/2;
-    const teat=new THREE.Mesh(new THREE.SphereGeometry(.3,10,10), toonMat({color:0xffe27a}));
-    teat.position.z=.3;
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(.28,.08,8,16), toonMat({color:0x7cd7ff}));
-    ring.position.z=-.2;
-    dummy.add(shield,teat,ring);
-    dummy.position.set(.75,1.5,.5); dummy.rotation.y=.5;
-    b.mesh.add(dummy);
-    const blanket=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.2,4,3), toonMat({color:0x7cd7ff, side:THREE.DoubleSide}));
-    blanket.position.set(-.8,1.6,.3); blanket.rotation.z=.4; b.mesh.add(blanket); b.blanket=blanket;
+  if(key==='dad'){
+    let headMesh=null, torsoMesh=null;
+    for(const ch of b.mesh.children){
+      if(ch.isMesh && ch.geometry===BOTGEO.head) headMesh=ch;
+      if(ch.isMesh && ch.geometry===BOTGEO.torso) torsoMesh=ch;
+    }
+    const eyeMat=toonMat({color:0xff2020, emissive:0xff2020, emissiveIntensity:1});
+    const eyeGeo=new THREE.BoxGeometry(.09,.09,.05);
+    const eyeL=new THREE.Mesh(eyeGeo,eyeMat); eyeL.position.set(-.13,.02,.29); headMesh.add(eyeL);
+    const eyeR=new THREE.Mesh(eyeGeo,eyeMat); eyeR.position.set(.13,.02,.29); headMesh.add(eyeR);
+    const hornMat=toonMat({color:0x1a0a12});
+    const hornGeo=new THREE.ConeGeometry(.09,.32,6);
+    const hornL=new THREE.Mesh(hornGeo,hornMat); hornL.position.set(-.18,.32,-.05); hornL.rotation.z=.35; headMesh.add(hornL);
+    const hornR=new THREE.Mesh(hornGeo,hornMat); hornR.position.set(.18,.32,-.05); hornR.rotation.z=-.35; headMesh.add(hornR);
+    const spikeMat=toonMat({color:0x2a1035});
+    const spikeGeo=new THREE.ConeGeometry(.14,.5,6);
+    const spikeL=new THREE.Mesh(spikeGeo,spikeMat); spikeL.position.set(-.55,.5,0); spikeL.rotation.z=.5; b.mesh.add(spikeL);
+    const spikeR=new THREE.Mesh(spikeGeo,spikeMat); spikeR.position.set(.55,.5,0); spikeR.rotation.z=-.5; b.mesh.add(spikeR);
+    const cape=new THREE.Mesh(new THREE.PlaneGeometry(1.3,1.6,3,4), toonMat({color:0x1a0a12, side:THREE.DoubleSide}));
+    cape.position.set(0,1.3,-.28); cape.rotation.x=-.15; b.mesh.add(cape);
+    if(torsoMesh){ torsoMesh.material.emissive.setHex(0x4a0a5a); torsoMesh.material.emissiveIntensity=.35; }
   }
   const chute=new THREE.Mesh(new THREE.ConeGeometry(2.4,1.8,10,1,true), toonMat({color:cfg.chute, side:THREE.DoubleSide}));
   chute.position.y=3.6; b.mesh.add(chute); b.chute=chute; b.dropping=true;
