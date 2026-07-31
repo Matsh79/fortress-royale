@@ -1808,7 +1808,7 @@ function voxelBurst(pos,colHex,colB){
   const matA=toonMat({color:colHex, transparent:true});
   const matB=toonMat({color:colB||SKIN_HEX, transparent:true});
   const cubes=[];
-  for(let i=0;i<24;i++){
+  for(let i=0;i<6;i++){
     const m=new THREE.Mesh(voxGeo, i%3===2?matB:matA);
     m.position.set(pos.x+rand(-.35,.35), rand(.3,2.1), pos.z+rand(-.35,.35));
     m.rotation.set(rand(0,3),rand(0,3),rand(0,3));
