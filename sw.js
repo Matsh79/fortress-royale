@@ -1,9 +1,12 @@
+const CACHE_NAME='fr-v2';
 self.addEventListener('install', e=>self.skipWaiting());
-self.addEventListener('activate', e=>e.waitUntil(clients.claim()));
+self.addEventListener('activate', e=>e.waitUntil(
+  caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))).then(()=>clients.claim())
+));
 self.addEventListener('fetch', e=>{
-  e.respondWith(fetch(e.request).then(r=>{
+  e.respondWith(fetch(e.request, {cache:'no-store'}).then(r=>{
     if(e.request.method==='GET' && new URL(e.request.url).origin===location.origin){
-      const c=r.clone(); caches.open('fr-v1').then(cache=>cache.put(e.request,c));
+      const c=r.clone(); caches.open(CACHE_NAME).then(cache=>cache.put(e.request,c));
     }
     return r;
   }).catch(()=>caches.match(e.request)));
