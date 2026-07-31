@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1a0f3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>FORTRESS ROYALE</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; overflow:hidden; background:#0b0e2a; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  /* ---------- LOBBY ---------- */
+  #lobby { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background: radial-gradient(1200px 800px at 70% 20%, #4b2d8f 0%, #2b1668 40%, #120a3a 100%); z-index:30; }
+  #lobby h1 { font-size: clamp(42px, 9vw, 96px); font-weight:900; font-style:italic; letter-spacing:2px;
+    background: linear-gradient(180deg,#fff26b 0%, #ffb52e 45%, #ff7a1a 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow: 0 6px 0 rgba(0,0,0,.25); transform: skew(-4deg); }
+  #lobby .sub { color:#c8bfff; font-weight:700; letter-spacing:6px; margin-top:-6px; font-size:clamp(11px,2vw,16px); }
+  @keyframes blink { 50% { opacity:.25 } }
+  .card { margin-top:34px; background:rgba(255,255,255,.07); border:2px solid rgba(255,255,255,.18);
+    border-radius:18px; padding:26px 30px; display:flex; flex-direction:column; gap:16px; align-items:center; backdrop-filter: blur(6px); }
+  .card input { font-size:18px; font-weight:800; text-align:center; padding:10px 16px; border-radius:10px;
+    border:2px solid #7d6bd6; background:#1a1150; color:#fff; outline:none; width:240px; }
+  .skins { display:flex; gap:10px; }
+  .skin { width:36px; height:36px; border-radius:50%; border:3px solid transparent; cursor:pointer; }
+  .skin.sel { border-color:#fff; transform:scale(1.15); }
+  .pcard { width:96px; padding:10px 6px 8px; border-radius:16px; border:3px solid rgba(255,255,255,.18); background:rgba(0,0,0,.28);
+    cursor:pointer; text-align:center; transition:all .12s; position:relative; }
+  .pcard:hover { transform:translateY(-3px); }
+  .pcard.sel { border-color:#ffe93b; background:rgba(255,233,59,.12); transform:scale(1.06); }
+  .pcard .av { width:58px; height:58px; border-radius:50%; margin:0 auto; background-size:cover; background-position:center;
+    display:flex; align-items:center; justify-content:center; font-size:30px; border:3px solid rgba(255,255,255,.3); }
+  .pcard .pn { color:#fff; font-weight:800; font-size:12px; margin-top:6px; }
+  .pcard .pa { color:#9f95d6; font-size:10px; margin-top:1px; }
+  .pcard .edit { position:absolute; top:3px; right:4px; font-size:14px; opacity:1; color:#fff;
+    width:22px; height:22px; line-height:22px; text-align:center; border-radius:50%;
+    background:rgba(0,0,0,.55); text-shadow:0 1px 2px #000; }
+  #playBtn { font-size:26px; font-weight:900; font-style:italic; letter-spacing:1px; padding:14px 58px; border:none; border-radius:14px;
+    background:linear-gradient(180deg,#ffe93b,#ffb400); color:#4a2d00; cursor:pointer; box-shadow:0 6px 0 #a86e00; transition:transform .06s; }
+  #playBtn:active { transform:translateY(4px); box-shadow:0 2px 0 #a86e00; }
+  .hint { color:#9f95d6; font-size:13px; max-width:420px; text-align:center; line-height:1.5; }
+  .tgl { padding:6px 14px; border-radius:999px; border:2px solid rgba(255,255,255,.25); background:rgba(0,0,0,.25);
+    color:#e8e2ff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; }
+  .hint b { color:#ffe27a; }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:20; display:none; }
+  #cross { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:0; }
+  #cross span { position:absolute; background:#7CFC00; box-shadow:0 0 4px #000; }
+  #healthWrap { position:absolute; left:24px; bottom:22px; width:280px; }
+  #shieldBar, #healthBar { height:16px; border-radius:8px; background:#123; margin-top:6px; overflow:hidden; border:2px solid rgba(0,0,0,.5); }
+  #healthFill { height:100%; width:100%; background:linear-gradient(90deg,#41d94d,#7CFC00); }
+  .barNum { position:absolute; left:50%; top:50%; transform:translate(-50%,-52%); font-size:11px; font-weight:900; color:#fff; text-shadow:0 1px 2px #000; pointer-events:none; }
+  #shieldBar, #healthBar { position:relative; }
+  .invW { padding:4px 8px; font-size:14px; }
+  .invIt { display:flex; align-items:center; gap:10px; padding:8px 10px; margin:6px 0; background:rgba(201,91,255,.12); border:1px solid rgba(201,91,255,.4); border-radius:10px; font-size:13px; }
+  .invIt button { padding:6px 16px; border:none; border-radius:8px; background:#c95bff; color:#fff; font-weight:900; cursor:pointer; }
+  #shieldFill { height:100%; width:60%; background:linear-gradient(90deg,#28a7ff,#6fd4ff); }
+  .slot { min-width:74px; text-align:center; padding:5px 8px; border-radius:8px; background:rgba(0,0,0,.45); color:#999; font-size:11px; font-weight:800; border:2px solid transparent; }
+  .slot.on { color:#fff; border-color:#ffd34d; background:rgba(0,0,0,.65); }
+  #interact { position:absolute; left:50%; top:58%; transform:translateX(-50%); color:#ffe27a; font-weight:900; font-size:18px; text-shadow:0 2px 0 #000; opacity:0; }
+  #ammo { position:absolute; right:28px; bottom:22px; color:#fff; font-weight:900; font-size:34px; text-shadow:0 2px 0 #000; font-style:italic; }
+  #ammo small { font-size:16px; color:#bbb; }
+  #weapon { position:absolute; right:28px; bottom:64px; color:#ffd34d; font-weight:800; letter-spacing:1px; text-shadow:0 2px 0 #000; }
+  #alive { position:absolute; top:18px; right:24px; color:#fff; font-weight:900; font-size:20px; text-shadow:0 2px 0 #000; background:rgba(0,0,0,.35); padding:8px 14px; border-radius:10px; }
+  #alive b { color:#ffe27a; }
+  #storm { position:absolute; top:18px; left:50%; transform:translateX(-50%); color:#e5d4ff; font-weight:800; text-shadow:0 2px 0 #000; background:rgba(80,30,140,.45); padding:7px 16px; border-radius:10px; font-size:15px; }
+  #feed { position:absolute; top:64px; right:24px; display:flex; flex-direction:column; gap:4px; align-items:flex-end; }
+  .feedItem { color:#fff; font-size:13px; font-weight:700; background:rgba(0,0,0,.45); padding:4px 10px; border-radius:8px; }
+  .feedItem b { color:#ff5e5e; }
+  #hitmark { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(45deg); font-size:30px; color:#fff; opacity:0; font-weight:900; text-shadow:0 0 6px #000; }
+  #dmgVign { position:absolute; inset:0; box-shadow: inset 0 0 120px rgba(255,0,0,.0); transition: box-shadow .15s; }
+  #msg { position:absolute; left:50%; top:34%; transform:translateX(-50%); color:#ffe27a; font-weight:900; font-size:28px; font-style:italic; text-shadow:0 3px 0 #000; opacity:0; transition:opacity .3s; text-align:center; }
+
+  /* ---------- END SCREEN ---------- */
+  #end { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; z-index:40;
+    background:rgba(10,5,35,.88); backdrop-filter: blur(4px); }
+  #endTitle { font-size: clamp(34px, 7vw, 72px); font-weight:900; font-style:italic;
+    background:linear-gradient(180deg,#fff26b,#ff7a1a); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #endStats { color:#cbc2ff; font-size:20px; font-weight:700; margin:18px 0 28px; }
+  #again { font-size:20px; font-weight:900; padding:12px 44px; border:none; border-radius:12px; cursor:pointer;
+    background:linear-gradient(180deg,#ffe93b,#ffb400); color:#4a2d00; box-shadow:0 5px 0 #a86e00; }
+
+  /* ---------- SNIPER SCOPE ---------- */
+  #scope { position:absolute; inset:0; display:none;
+    background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0 28%, rgba(0,0,0,.55) 32%, rgba(0,0,0,.97) 40%); }
+  #scope .sl { position:absolute; background:rgba(0,0,0,.8); }
+
+  /* ---------- TOUCH CONTROLS ---------- */
+  #app canvas { touch-action:none; }
+  #touchUI { display:none; }
+  .tbtn { position:absolute; border-radius:50%; background:rgba(255,255,255,.14); border:2px solid rgba(255,255,255,.45);
+    color:#fff; display:flex; align-items:center; justify-content:center; font-weight:900;
+    pointer-events:auto; touch-action:none; user-select:none; -webkit-user-select:none; text-shadow:0 2px 0 #000; }
+  #btnFire { right:24px; bottom:130px; width:88px; height:88px; font-size:32px; background:rgba(255,90,60,.28); }
+  #btnJump { right:132px; bottom:44px; width:64px; height:64px; font-size:24px; }
+  #btnE { right:44px; bottom:246px; width:58px; height:58px; font-size:24px; background:rgba(255,210,60,.35); color:#ffe27a; display:none; }
+  #btnBag { right:24px; bottom:320px; width:54px; height:54px; font-size:22px; background:rgba(201,91,255,.3); }
+  #btnWall { right:130px; bottom:132px; width:60px; height:60px; font-size:22px; background:rgba(176,125,76,.35); }
+  #btnRamp { right:130px; bottom:204px; width:60px; height:60px; font-size:22px; background:rgba(176,125,76,.35); }
+  #btnCrouch { left:190px; bottom:130px; width:60px; height:60px; font-size:24px; }
+  #joyBase { position:absolute; left:22px; bottom:110px; width:150px; height:150px; border-radius:50%;
+    background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.3); pointer-events:auto; touch-action:none; }
+  #joyKnob { position:absolute; left:47px; top:47px; width:56px; height:56px; border-radius:50%; background:rgba(255,255,255,.45); }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)} 40%{transform:translateX(10px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+html, body { overscroll-behavior:none; }
+
+  /* ---------- CHEAT TOAST ---------- */
+  #cheatToast { position:fixed; left:0; right:0; top:34%; z-index:70; display:none; padding:16px 0;
+    background:rgba(0,0,0,.92); border-top:4px solid #ffd34d; border-bottom:4px solid #ffd34d;
+    color:#ffd34d; font-family:'Courier New',monospace; font-weight:900; font-size:clamp(17px,4vw,32px);
+    text-align:center; letter-spacing:5px; pointer-events:none; }
+  @keyframes cheatPop { 0%{transform:scaleY(.05); opacity:1} 10%{transform:scaleY(1)} 80%{opacity:1} 100%{opacity:0} }
+
+  /* ---------- ARCADE HIGH-SCORE INITIALS ---------- */
+  #hsPanel { display:none; position:fixed; inset:0; z-index:50; align-items:center; justify-content:center;
+    background:rgba(6,3,22,.93); font-family:'Courier New',monospace; }
+  #hsPanel .hsBox { text-align:center; color:#ffd34d; padding:24px 30px; border:4px double #ffd34d;
+    border-radius:8px; background:#0c0620; max-width:94vw; }
+  #hsTitle { font-size:clamp(22px,5vw,40px); font-weight:900; letter-spacing:4px; animation:blink 1s steps(2) infinite; }
+  #hsScore { color:#fff; font-size:15px; margin:8px 0 16px; letter-spacing:2px; }
+  .hsSlot { display:inline-flex; flex-direction:column; align-items:center; gap:6px; margin:0 10px; }
+  .hsLetter { width:56px; height:64px; line-height:64px; font-size:42px; font-weight:900;
+    border:3px solid #7a5c12; background:#000; color:#ffd34d; cursor:pointer; user-select:none; }
+  .hsLetter.hsCur { border-color:#fff26b; box-shadow:0 0 12px rgba(255,211,77,.7); animation:blink 1s steps(2) infinite; }
+  .hsArrow { width:44px; padding:4px 0; font-size:15px; background:#221542; color:#ffd34d;
+    border:2px solid #7a5c12; cursor:pointer; font-family:inherit; font-weight:900; }
+  #hsLetters { display:grid; grid-template-columns:repeat(9,1fr); gap:6px; max-width:350px; margin:16px auto; }
+  #hsLetters button { padding:8px 0; font-family:inherit; font-weight:900; font-size:15px;
+    background:#160d33; color:#ffd34d; border:2px solid #7a5c12; cursor:pointer; }
+  #hsDone { padding:10px 34px; font-family:inherit; font-weight:900; font-size:18px; letter-spacing:2px;
+    background:#ffd34d; color:#3a2a00; border:none; cursor:pointer; }
+  #hsSkip { margin-left:12px; padding:10px 16px; font-family:inherit; font-size:12px;
+    background:none; color:#8a7c50; border:2px solid #4a3c20; cursor:pointer; }
+
+  /* ---------- END-SCREEN LEADERBOARD: your row blinks arcade-style ---------- */
+  .meRow { background:rgba(255,211,77,.22); border:2px solid #ffd34d; border-radius:6px; animation:meBlink .8s steps(2) infinite; }
+  @keyframes meBlink { 50% { background:rgba(255,211,77,.5); border-color:#fff; } }
+#lockBox.locking { color:#ffe93b; opacity:.85; animation: blink .5s infinite; }
+  #lockBox.locked { color:#ff4444; opacity:1; text-shadow:0 0 8px rgba(255,60,60,.8); }
+  #lockBox b { font-size:11px; letter-spacing:2px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="loginOverlay" style="position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 30%, #2a1a5e, #120a30);">
+  <div id="loginBox" style="background:#1a0f3d; border:3px solid #ffb400; border-radius:18px; padding:28px 34px; width:min(440px,92vw); text-align:center; color:#e8e2ff;">
+    <div style="font-weight:900; font-size:26px; color:#ffe93b;">FORTRESS ROYALE</div>
+    <div style="font-size:13px; opacity:.7; margin-bottom:14px;">WHO GOES THERE? LOG IN, SOLDIER.</div>
+    <input id="loginUser" type="text" placeholder="username (your first name)" autocomplete="off" style="width:80%; margin-bottom:8px; padding:10px 14px; border-radius:10px; border:2px solid rgba(255,180,0,.5); background:rgba(10,5,35,.7); color:#fff; font-size:15px; text-align:center; outline:none;">
+    <input id="loginPw" type="password" placeholder="password" autocomplete="off" style="width:80%; padding:10px 14px; border-radius:10px; border:2px solid rgba(255,180,0,.5); background:rgba(10,5,35,.7); color:#fff; font-size:15px; text-align:center; outline:none;">
+    <div id="loginErr" style="color:#ff8a8a; font-weight:800; font-size:13px; min-height:18px; margin-top:6px;"></div>
+    <button onclick="tryLogin()" style="margin-top:8px; padding:10px 34px; border:none; border-radius:10px; background:#ffb400; font-weight:900; font-size:16px; cursor:pointer;">ENTER THE ISLAND</button>
+    <div style="font-size:12px; opacity:.75; margin-top:12px;">New player? <a id="createLink" href="#" style="color:#ffd34d; font-weight:800;">CREATE PROFILE</a> <span style="opacity:.6">or ask Mika for an invite</span></div>
+  </div>
+  <div id="signupBox" style="display:none; background:#1a0f3d; border:3px solid #ffb400; border-radius:18px; padding:24px 30px; width:min(420px,92vw); text-align:center; color:#e8e2ff;">
+    <div style="font-weight:900; font-size:22px; color:#ffe93b;">📝 NEW RECRUIT</div>
+    <div style="font-size:12px; opacity:.7; margin-bottom:12px;">SIGN UP — AN ADMIN MUST APPROVE YOU</div>
+    <div id="suForm">
+      <input id="suName" maxlength="14" placeholder="your first name" autocomplete="off" style="width:80%; margin-bottom:8px; padding:10px 14px; border-radius:10px; border:2px solid rgba(255,180,0,.5); background:rgba(10,5,35,.7); color:#fff; font-size:15px; text-align:center; outline:none;">
+      <input id="suAge" type="number" min="3" max="99" placeholder="age (optional)" style="width:80%; margin-bottom:8px; padding:10px 14px; border-radius:10px; border:2px solid rgba(255,180,0,.5); background:rgba(10,5,35,.7); color:#fff; font-size:15px; text-align:center; outline:none;">
+      <div style="font-size:12px; color:#c8bfff; font-weight:700; margin:4px 0;">Pick your character:</div>
+      <div id="suChars" style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:8px;"></div>
+      <input id="suPw" type="password" placeholder="choose a password" autocomplete="off" style="width:80%; padding:10px 14px; border-radius:10px; border:2px solid rgba(255,180,0,.5); background:rgba(10,5,35,.7); color:#fff; font-size:15px; text-align:center; outline:none;">
+      <div id="suErr" style="color:#ff8a8a; font-weight:800; font-size:13px; min-height:18px; margin-top:6px;"></div>
+      <button id="suGo" style="margin-top:4px; padding:10px 34px; border:none; border-radius:10px; background:#ffb400; font-weight:900; font-size:16px; cursor:pointer;">CREATE PROFILE</button>
+    </div>
+    <div id="suDone" style="display:none; font-weight:800; color:#ffe27a; font-size:16px; margin:16px 0;">⏳ Waiting for Mika's approval<br><small style="opacity:.6; font-weight:400; font-size:12px;">An admin must approve you in the 🛡 ADMIN panel before you can play</small></div>
+    <div><button id="suBack" style="background:none; border:none; color:#9f95d6; font-size:12px; font-weight:700; cursor:pointer; text-decoration:underline; font-family:inherit; margin-top:10px;">← back to login</button></div>
+  </div>
+</div>
+<div id="adminOverlay" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:46; background:rgba(10,5,35,.9);">
+  <div style="background:#1a0f3d; border:3px solid #ffb400; border-radius:18px; padding:24px 28px; width:min(580px,94vw); max-height:88vh; overflow-y:auto; color:#e8e2ff;">
+    <div style="font-weight:900; font-size:22px; color:#ffe93b;">🛡 ADMIN PANEL</div>
+    <div style="font-size:12px; opacity:.6; margin-bottom:12px;">approve recruits · manage soldiers · send invite links</div>
+    <div id="adminList"></div>
+    <button id="admNew" style="margin-top:10px; padding:9px 18px; border:none; border-radius:10px; background:linear-gradient(180deg,#ffe93b,#ffb400); color:#4a2d00; font-weight:900; font-size:13px; cursor:pointer; font-family:inherit;">➕ CREATE &amp; INVITE NEW PLAYER</button>
+    <div id="invitePane" style="display:none; margin-top:12px; background:rgba(255,180,0,.08); border:2px solid rgba(255,180,0,.5); border-radius:12px; padding:12px;">
+      <div id="invName" style="font-weight:800; color:#ffe27a; font-size:13px; margin-bottom:6px;"></div>
+      <input id="invUrl" readonly style="width:100%; box-sizing:border-box; padding:8px 10px; border-radius:8px; border:2px solid rgba(255,180,0,.4); background:rgba(10,5,35,.7); color:#8fd3f4; font-size:11px; font-family:monospace; outline:none;">
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button id="invCopy" style="padding:7px 16px; border:none; border-radius:8px; background:#ffb400; color:#4a2d00; font-weight:900; font-size:12px; cursor:pointer; font-family:inherit;">📋 COPY</button>
+        <button id="invShare" style="display:none; padding:7px 16px; border:none; border-radius:8px; background:#3a2a75; color:#fff; font-weight:900; font-size:12px; cursor:pointer; font-family:inherit;">📤 SHARE</button>
+      </div>
+      <div id="invMsg" style="font-size:11px; color:#7CFC00; min-height:15px; margin-top:5px; font-weight:700;"></div>
+    </div>
+    <div style="font-weight:900; font-size:18px; color:#e0b3ff; margin-top:18px;">🧪 STROYER LAB <span style="font-size:11px; font-weight:400; opacity:.6;">— tune the bosses (applies next match, this device)</span></div>
+    <div id="labList"></div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button onclick="saveLab()" style="padding:8px 18px; border:none; border-radius:9px; background:#c95bff; color:#fff; font-weight:900; font-size:12px; cursor:pointer; font-family:inherit;">💾 SAVE LAB</button>
+      <button onclick="resetLab()" style="padding:8px 18px; border:none; border-radius:9px; background:#3a2a75; color:#fff; font-weight:900; font-size:12px; cursor:pointer; font-family:inherit;">↩ FACTORY RESET</button>
+    </div>
+    <button onclick="document.getElementById('adminOverlay').style.display='none'" style="margin-top:14px; padding:8px 22px; border:none; border-radius:10px; background:#ffb400; font-weight:800; cursor:pointer;">CLOSE</button>
+  </div>
+</div>
+<div id="lobby">
+  <h1>FORTRESS ROYALE</h1>
+  <div class="sub">DROP &nbsp;&middot;&nbsp; LOOT &nbsp;&middot;&nbsp; LAST ONE STANDING</div>
+  <div style="font-size:12px; color:#bfb3ee; margin-top:4px;">bot colours = threat: 🟢 easy · 🔵 tough · 🔴 hard · 🟣 brutal (mix depends on mode)</div>
+  <div class="card">
+    <input id="pname" maxlength="14" placeholder="YOUR NAME" value="">
+    <div style="color:#c8bfff; font-weight:800; font-size:13px; letter-spacing:2px;">WHO'S PLAYING?</div>
+    <div id="players" style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;"></div>
+    <div id="pEditor" style="display:none; flex-direction:column; gap:8px; background:rgba(0,0,0,.3); border:2px solid rgba(255,255,255,.2); border-radius:14px; padding:14px; width:300px;">
+      <input id="peName" maxlength="14" placeholder="Name" style="font-size:14px; font-weight:800; padding:8px 12px; border-radius:8px; border:2px solid #7d6bd6; background:#1a1150; color:#fff; outline:none;">
+      <input id="peAge" type="number" min="3" max="99" placeholder="Age" style="font-size:14px; font-weight:800; padding:8px 12px; border-radius:8px; border:2px solid #7d6bd6; background:#1a1150; color:#fff; outline:none;">
+      <label style="color:#c8bfff; font-size:12px; font-weight:700;">📷 Photo: <input id="pePhoto" type="file" accept="image/*" style="font-size:11px; color:#c8bfff;"></label>
+      <div style="color:#c8bfff; font-size:11px; font-weight:700;">Character colour:</div>
+      <div id="peChars" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+      <div style="color:#c8bfff; font-size:11px; font-weight:700;">Default difficulty:</div>
+      <select id="peDiff" style="font-size:12px; font-weight:700; padding:6px; border-radius:8px; background:#1a1150; color:#fff; border:2px solid #7d6bd6;">
+        <option value="0">PIECE OF CAKE</option><option value="1" selected>LET'S ROCK</option>
+        <option value="2">COME GET SOME</option><option value="3">DAMN, I'M GOOD</option>
+      </select>
+      <div style="display:flex; gap:8px;">
+        <button id="peSave" style="flex:1; padding:8px; border:none; border-radius:8px; background:#ffb400; font-weight:800; cursor:pointer;">SAVE</button>
+        <button id="peDel" style="padding:8px 12px; border:none; border-radius:8px; background:#d9534f; color:#fff; font-weight:800; cursor:pointer;">🗑</button>
+      </div>
+    </div>
+    <div class="skins" id="skins" style="display:none;"></div>
+    <div id="diffs" style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; max-width:460px;"></div>
+    <div id="botrow" style="display:flex; gap:8px; align-items:center; color:#9f95d6; font-size:9px;">OPPONENTS:<span id="botopts" style="display:flex; gap:6px;"></span></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
+      <button id="nightTgl" class="tgl">🌙 NIGHT OPS</button>
+      <button id="crtTgl" class="tgl">📺 CRT MODE</button>
+      <button id="perfTgl" class="tgl">⚡ PERFORMANCE</button>
+    </div>
+    <div style="display:flex; gap:6px; align-items:center; color:#9f95d6; font-size:9px; flex-wrap:wrap; justify-content:center;">MUTATORS:<span id="muts" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;"></span></div>
+    <button id="playBtn">▶ &nbsp;PLAY</button>
+    <div style="display:flex; gap:8px;">
+      <button id="lbBtn" style="font-size:13px; font-weight:800; padding:8px 22px; border:2px solid rgba(255,255,255,.3); border-radius:10px; background:rgba(0,0,0,.25); color:#ffe27a; cursor:pointer;">🏆 LEADERBOARD</button>
+      <button id="adminBtn" style="display:none; font-size:13px; font-weight:800; padding:8px 22px; border:2px solid rgba(255,180,0,.6); border-radius:10px; background:rgba(0,0,0,.25); color:#ffd34d; cursor:pointer; font-family:inherit;">🛡 ADMIN</button>
+    </div>
+    <div class="hint"><b>WASD</b> move &middot; <b>Mouse</b> look &middot; <b>Click</b> shoot &middot; <b>1/2/3</b> weapon slots · <b>E</b> chests / loot / karts / supply drops &middot; <b>R</b> reload &middot; <b>Shift</b> sprint &middot; <b>Space</b> jump<br>
+    <b>Q</b> build wall &middot; <b>F</b> build ramp &middot; <b>V</b> dance &middot; <b>Right-mouse</b> sniper scope<br>
+    You drop with just a <b>knife</b> — loot golden <b>chests</b> for guns. Outrun the <b>storm</b>, claim the <b>Victory Royale</b>.</div>
+  </div>
+</div>
+
+<div id="invOverlay" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:44; background:rgba(10,5,35,.85);">
+  <div style="background:#1a0f3d; border:3px solid #c95bff; border-radius:16px; padding:22px 28px; width:min(480px,92vw); max-height:80vh; overflow-y:auto; color:#e8e2ff;">
+    <div style="font-weight:900; font-size:20px; color:#c95bff;">🎒 INVENTORY <span style="float:right; font-size:12px; opacity:.6; font-weight:400;">game paused</span></div>
+    <div id="invBody" style="margin-top:10px;"></div>
+    <button onclick="toggleInvOverlay()" style="margin-top:14px; padding:8px 22px; border:none; border-radius:10px; background:#ffb400; font-weight:800; cursor:pointer;">RESUME (Tab)</button>
+  </div>
+</div>
+<div id="lbOverlay" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:45; background:rgba(10,5,35,.9);">
+  <div style="background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.2); border-radius:18px; padding:26px 34px; max-width:560px; width:94%; max-height:86vh; overflow-y:auto;">
+    <h2 style="color:#ffe27a; font-style:italic; margin-bottom:14px;">🏆 HALL OF FAME</h2>
+    <input id="lbSearch" type="text" placeholder="🔎 Search a player — see their whole career… (Mika's idea)" autocomplete="off"
+      style="width:100%; box-sizing:border-box; margin-bottom:10px; padding:10px 14px; border-radius:10px; border:2px solid rgba(111,212,255,.5); background:rgba(10,5,35,.7); color:#e8e2ff; font-size:14px; font-family:inherit; outline:none;">
+    <div id="lbDossier"></div>
+    <div id="lbList" style="color:#e8e2ff; font-size:14px; line-height:2;">loading…</div>
+    <button onclick="document.getElementById('lbOverlay').style.display='none'" style="margin-top:16px; padding:8px 22px; border:none; border-radius:10px; background:#ffb400; font-weight:800; cursor:pointer;">CLOSE</button>
+  </div>
+</div>
+
+<div id="hud">
+  <div id="cross"></div>
+  <div id="hitmark">✕</div>
+  <div id="reloadWheel" style="display:none; position:absolute; left:50%; top:56%; transform:translateX(-50%); width:46px; height:46px; border-radius:50%; background:conic-gradient(#ffe93b 0deg, rgba(0,0,0,.55) 0deg); border:3px solid rgba(0,0,0,.5);"></div>
+  <div id="dmgVign"></div>
+  <div id="storm">⛈ Storm closing…</div>
+  <div id="lockBox" style="position:absolute; display:none; transform:translate(-50%,-50%); text-align:center; font-weight:900; font-size:22px; line-height:1.1; pointer-events:none; z-index:22;"></div>
+  <div id="bossEta" style="position:absolute; top:56px; left:50%; transform:translateX(-50%); display:none; color:#e0b3ff; font-weight:900; font-size:14px; text-shadow:0 2px 0 #000; background:rgba(40,10,60,.5); padding:5px 14px; border-radius:9px;">☠ DADSTROYER: 2:35</div>
+  <div id="bossBarWrap" style="display:none; position:absolute; top:56px; left:50%; transform:translateX(-50%); width:min(520px,78vw); text-align:center;">
+    <div style="font-weight:900; font-size:13px; color:#ff9df0; text-shadow:0 2px 0 #000; letter-spacing:3px;">☠ DR. DADSTROYER ☠</div>
+    <div style="height:13px; border-radius:7px; background:#31103a; border:2px solid rgba(0,0,0,.6); overflow:hidden; margin-top:2px;"><div id="bossBarFill" style="height:100%; width:100%; background:linear-gradient(90deg,#c26bff,#ff4de3);"></div></div>
+  </div>
+  <div id="fps" style="position:absolute; top:18px; left:24px; font-family:'Courier New',monospace; font-weight:700; font-size:13px; color:#7CFC00; text-shadow:0 1px 2px #000; background:rgba(0,0,0,.35); padding:3px 8px; border-radius:8px;">-- FPS</div>
+  <div id="graceT" style="display:none; position:absolute; left:24px; top:50%; transform:translateY(-50%); font-size:44px; font-weight:900; font-style:italic; color:#7CFC00; text-shadow:0 3px 0 #000; background:rgba(0,0,0,.4); padding:10px 18px; border-radius:14px;">🕊 30</div>
+  <canvas id="minimap" width="180" height="180" style="position:absolute; top:64px; left:24px; border-radius:50%; border:3px solid rgba(255,255,255,.4); background:rgba(10,20,40,.55);"></canvas>
+  <div id="stormWarn" style="position:absolute; left:50%; top:22%; transform:translateX(-50%); color:#ff4de3; font-size:15px; text-shadow:0 2px 0 #000; opacity:0; animation: blink 0.7s steps(2) infinite;">⚠ YOU ARE IN THE STORM — GET INSIDE ⚠</div>
+  <div id="alive">👥 <b id="aliveN">13</b> alive &nbsp;|&nbsp; 💀 <b id="killsN">0</b></div>
+  <div id="feed"></div>
+  <div id="slots" style="position:absolute; right:28px; bottom:96px; display:flex; gap:6px;"></div>
+  <div id="weapon">COMBAT KNIFE</div>
+  <div id="reloadHint" style="position:absolute; left:50%; top:64%; transform:translateX(-50%); display:none; color:#ff4444; font-weight:900; font-size:20px; text-shadow:0 2px 0 #000; animation:blink .6s steps(2) infinite;">⚠ PRESS R — RELOAD</div>
+  <div id="ammo"><span id="ammoN">30</span><small id="ammoRes">/90</small></div>
+  <div id="healthWrap"><div id="shieldBar"><div id="shieldFill"></div><span class="barNum" id="shNum">50</span></div><div id="healthBar"><div id="healthFill"></div><span class="barNum" id="hpNum">100/100</span></div></div>
+  <div id="fxHud" style="position:absolute; left:28px; bottom:120px; font-weight:800; font-size:15px; color:#d5a6ff; text-shadow:0 1px 3px #000;"></div>
+  <div id="grapHud" style="position:absolute; left:24px; bottom:96px; font-weight:900; font-size:14px; color:#8fd3f4; text-shadow:0 1px 3px #000;">🪝 READY (G)</div>
+  <div id="woodHud" style="position:absolute; right:28px; bottom:64px; font-weight:900; font-size:16px; color:#e8c48a; text-shadow:0 1px 3px #000;">🪵 20</div>
+  <div id="msg"></div>
+  <div id="interact">E — open chest</div>
+  <div id="zoneToast" style="position:absolute; left:50%; top:27%; transform:translateX(-50%); color:#fff; font-weight:900; font-size:26px; font-style:italic; letter-spacing:2px; text-shadow:0 3px 0 #000; opacity:0; transition:opacity .4s; white-space:nowrap;"></div>
+  <div id="specBanner" style="position:absolute; left:50%; top:15%; transform:translateX(-50%); color:#ff5e5e; font-weight:900; font-size:24px; font-style:italic; text-shadow:0 3px 0 #000; display:none; text-align:center;">☠ ELIMINATED — spectating…<br><small style="font-size:13px; color:#e8e2ff; font-style:normal;">click or press any key to see results</small></div>
+  <div id="scope">
+    <div class="sl" style="left:0; right:0; top:50%; height:1px;"></div>
+    <div class="sl" style="top:0; bottom:0; left:50%; width:1px;"></div>
+    <div style="position:absolute; left:50%; top:50%; width:5px; height:5px; margin:-2.5px; border-radius:50%; background:rgba(255,60,60,.9);"></div>
+  </div>
+  <div id="touchUI">
+    <div id="joyBase"><div id="joyKnob"></div></div>
+    <div id="btnFire" class="tbtn">🔥</div>
+    <div id="btnJump" class="tbtn">⬆</div>
+    <div id="btnE" class="tbtn">E</div>
+    <div id="btnBag" class="tbtn">🎒</div>
+    <div id="btnWall" class="tbtn">🧱</div>
+    <div id="btnRamp" class="tbtn">📐</div>
+    <div id="btnCrouch" class="tbtn">🦆</div>
+    <div id="btnGrap" class="tbtn" style="right:208px; bottom:164px; width:56px; height:56px; font-size:22px; background:rgba(111,212,255,.3);">🪝</div>
+  </div>
+</div>
+
+<div id="kcTint" style="display:none; position:fixed; inset:0; pointer-events:none; z-index:36; background:radial-gradient(circle at 50% 50%, rgba(155,48,255,.10), rgba(80,10,140,.42));"></div>
+<div id="kcText" style="display:none; position:fixed; left:50%; top:18%; transform:translateX(-50%); z-index:37; font-family:'Courier New',monospace; font-weight:900; font-size:clamp(26px,6vw,54px); color:#ff4de3; text-shadow:0 4px 0 #000; letter-spacing:5px; text-align:center; animation:blink 1s steps(2) infinite; pointer-events:none;"></div>
+<div id="crt" style="display:none; position:fixed; inset:0; pointer-events:none; z-index:96; background: repeating-linear-gradient(0deg, rgba(0,0,0,.24) 0px, rgba(0,0,0,.24) 1px, rgba(80,255,140,.025) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 3px), radial-gradient(ellipse 130% 130% at 50% 50%, rgba(80,255,140,.05) 0%, rgba(0,0,0,0) 55%, rgba(0,0,0,.42) 100%);"></div>
+<div id="attractUI" style="display:none; position:fixed; inset:0; z-index:28; pointer-events:none;">
+  <div style="position:absolute; top:9vh; left:0; right:0; text-align:center; font-family:'Courier New',monospace; font-weight:900; font-size:clamp(30px,7vw,64px); color:#ffe93b; text-shadow:0 5px 0 #000; letter-spacing:6px;">FORTRESS ROYALE</div>
+  <div style="position:absolute; bottom:16vh; left:0; right:0; text-align:center;">
+    <div style="font-family:'Courier New',monospace; font-weight:900; font-size:clamp(22px,5vw,44px); color:#ffd34d; text-shadow:0 3px 0 #000; letter-spacing:8px; animation:blink 1s steps(2) infinite;">INSERT COIN</div>
+    <div style="font-family:'Courier New',monospace; font-weight:900; font-size:clamp(13px,2.5vw,20px); color:#fff; text-shadow:0 2px 0 #000; letter-spacing:4px; margin-top:10px;">PRESS ANY KEY TO PLAY</div>
+  </div>
+</div>
+<div id="cheatToast"></div>
+<div id="hsPanel">
+  <div class="hsBox">
+    <div id="hsTitle">★ NEW HIGH SCORE! ★</div>
+    <div id="hsScore"></div>
+    <div>
+      <span class="hsSlot"><button id="hsUp0" class="hsArrow">▲</button><div id="hsL0" class="hsLetter hsCur">A</div><button id="hsDn0" class="hsArrow">▼</button></span>
+      <span class="hsSlot"><button id="hsUp1" class="hsArrow">▲</button><div id="hsL1" class="hsLetter">A</div><button id="hsDn1" class="hsArrow">▼</button></span>
+      <span class="hsSlot"><button id="hsUp2" class="hsArrow">▲</button><div id="hsL2" class="hsLetter">A</div><button id="hsDn2" class="hsArrow">▼</button></span>
+    </div>
+    <div id="hsLetters"></div>
+    <div><button id="hsDone">✓ DONE</button><button id="hsSkip">skip</button></div>
+  </div>
+</div>
+
+<div id="end">
+  <div id="endTitle">#1 VICTORY ROYALE</div>
+  <div id="endStats"></div>
+  <div id="endLb" style="color:#e8e2ff; font-size:14px; line-height:1.9; margin-bottom:22px; text-align:left; min-width:280px;"></div>
+  <button id="again">PLAY AGAIN</button>
+</div>
+
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="game.js"></script>
+<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});</script>
+</body>
+</html>
