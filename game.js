@@ -404,17 +404,15 @@ $('admNew').onclick=()=>{
   loginSel=ix; completeLogin();
   setTimeout(()=>cheatToast('🎉 WELCOME TO THE ISLAND, '+nm.toUpperCase()+'!'), 400);   // deferred: cheatToast state initialises later in this file
 })();
-[4,8,12,16,20].forEach(n=>{
-  const b=document.createElement('button'); b.textContent=n;
-  b.style.cssText='padding:6px 12px;border-radius:8px;border:2px solid rgba(255,255,255,.25);background:rgba(0,0,0,.25);color:#e8e2ff;font-family:inherit;font-weight:800;font-size:13px;cursor:pointer;';
-  b.onclick=()=>{ botCount=n; [...$('botopts').children].forEach(x=>x.style.borderColor='rgba(255,255,255,.25)'); b.style.borderColor='#ffe93b'; };
-  $('botopts').appendChild(b);
+$('botCountInput').addEventListener('input', ()=>{
+  const v=parseInt($('botCountInput').value);
+  botCount = v ? clamp(v,1,60) : 0;   // 0 = use difficulty default
 });
 
 // ---------- three ----------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87c9ff);
-scene.fog = new THREE.Fog(0x87c9ff, 90, 240);
+scene.fog = new THREE.Fog(0x87c9ff, 108, 288);
 const camera = new THREE.PerspectiveCamera(80, innerWidth/innerHeight, 0.1, 500);
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
@@ -532,7 +530,7 @@ const clouds=[];
 }
 
 // ---------- map ----------
-const MAP = 150;
+const MAP = 180;
 const obstacles = [];
 function box(w,h,d,x,y,z,color,rotY=0,tex){
   const p={color}; if(tex) p.map=tex;
@@ -675,7 +673,7 @@ function tower(x,z,storeys){
 const towers=TOWERS.map(t=>tower(t.x,t.z,t.s));
 
 // ---------- storm ----------
-let stormR=200, stormTarget=200, stormShrinkRate=0;
+let stormR=240, stormTarget=240, stormShrinkRate=0;
 const stormMat = new THREE.MeshBasicMaterial({color:0x9b30ff,transparent:true,opacity:.3,side:THREE.DoubleSide,depthWrite:false});
 const stormWall = new THREE.Mesh(new THREE.CylinderGeometry(200,200,160,64,1,true), stormMat);
 stormWall.position.y=40; scene.add(stormWall);
@@ -684,7 +682,7 @@ const stormWall2 = new THREE.Mesh(new THREE.CylinderGeometry(199,199,160,64,1,tr
 stormWall2.position.y=40; scene.add(stormWall2);
 const edgeRing = new THREE.Mesh(new THREE.RingGeometry(0.985,1,96), new THREE.MeshBasicMaterial({color:0xff4de3,transparent:true,opacity:.85,side:THREE.DoubleSide,depthWrite:false}));
 edgeRing.rotation.x=-Math.PI/2; edgeRing.position.y=0.15; edgeRing.scale.setScalar(200); scene.add(edgeRing);
-const stormPhases=[{wait:75,to:100,rate:1.0},{wait:70,to:50,rate:0.9},{wait:60,to:20,rate:0.8},{wait:50,to:6,rate:0.7}];  // ~5 min match  // outrunnable: max 10u/s vs sprint 14.5
+const stormPhases=[{wait:75,to:120,rate:1.0},{wait:70,to:60,rate:0.9},{wait:60,to:24,rate:0.8},{wait:50,to:7,rate:0.7}];  // ~5 min match  // outrunnable: max 10u/s vs sprint 14.5
 let phaseIx=0, phaseTimer=stormPhases[0].wait, shrinking=false;
 // lightning flashes inside the storm wall while it shrinks (thunder throttled to 1 per 10s)
 const boltLight=new THREE.PointLight(0xb44dff,0,110);
@@ -706,7 +704,7 @@ const MOODS=[
 const moodSky=new THREE.Color(0x87c9ff), moodFog=new THREE.Color(0x87c9ff);
 function updateMood(){
   if(nightMode) return;                          // WAVE2: night ops — already dark, sunset lerp disabled
-  const t=clamp((200-stormR)/180,0,1);           // stormR 200 → 20 maps day → dusk
+  const t=clamp((240-stormR)/216,0,1);           // stormR 240 → 24 maps day → dusk
   const a=MOODS[t<.5?0:1], b=MOODS[t<.5?1:2], k=t<.5?t*2:(t-.5)*2;
   moodSky.lerpColors(a.sky,b.sky,k);
   moodFog.lerpColors(a.fog,b.fog,k);
@@ -715,7 +713,7 @@ function updateMood(){
   hemi.color.lerpColors(a.hemS,b.hemS,k);  hemi.groundColor.lerpColors(a.hemG,b.hemG,k);
   hemi.intensity=a.hemI+(b.hemI-a.hemI)*k;
   sun.position.lerpVectors(a.sp,b.sp,k);
-  scene.fog.far=240-50*t;
+  scene.fog.far=288-60*t;
 }
 
 // ---------- weapons ----------
@@ -1118,14 +1116,14 @@ function applyNight(on){
     sun.color.setHex(0x9db8ff); sun.intensity=.4; sun.position.set(-70,110,-50);   // moonlight (shadows stay on)
     amb.color.setHex(0x2a3a66); amb.intensity=.4;
     hemi.color.setHex(0x24365e); hemi.groundColor.setHex(0x141c2e); hemi.intensity=.3;
-    scene.fog.far=210;
+    scene.fog.far=252;
   } else {
     const M=MOODS[0];
     moodSky.copy(M.sky); moodFog.copy(M.fog);
     sun.color.copy(M.sunC); sun.intensity=M.sunI; sun.position.copy(M.sp);
     amb.color.copy(M.ambC); amb.intensity=M.ambI;
     hemi.color.copy(M.hemS); hemi.groundColor.copy(M.hemG); hemi.intensity=M.hemI;
-    scene.fog.far=240;
+    scene.fog.far=288;
   }
   scene.background.copy(moodSky); scene.fog.color.copy(moodFog);
 }
