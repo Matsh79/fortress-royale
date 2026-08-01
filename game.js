@@ -1470,8 +1470,8 @@ function exitKart(){
 function driveKart(dt){
   const k=curKart, nowS=performance.now()/1000;
   let acc=0, steer=0;
-  if(keys['KeyW']) acc+=1;  if(keys['KeyS']) acc-=1;
-  if(keys['KeyA']) steer+=1; if(keys['KeyD']) steer-=1;
+  if(keys[keybinds.forward]) acc+=1;  if(keys[keybinds.back]) acc-=1;
+  if(keys[keybinds.left]) steer+=1; if(keys[keybinds.right]) steer-=1;
   if(isTouch){ acc+=-joyY; steer+=-joyX; }
   acc=clamp(acc,-1,1); steer=clamp(steer,-1,1);
   if(acc) k.speed += acc*(acc>0?16:20)*dt;
@@ -1709,6 +1709,51 @@ function drawTag(b){
   b.tagTex.needsUpdate=true; b.hpShown=b.hp;
 }
 // ---------- input ----------
+// WAVE4: remappable keybinds — persisted, falls back to defaults for any action missing from an old save
+const KEYBIND_ACTIONS = [
+  {id:'forward', label:'Move Forward'}, {id:'back', label:'Move Backward'},
+  {id:'left', label:'Strafe Left'}, {id:'right', label:'Strafe Right'},
+  {id:'jump', label:'Jump'}, {id:'sprint', label:'Sprint'}, {id:'crouch', label:'Crouch'},
+  {id:'reload', label:'Reload'}, {id:'interact', label:'Interact / Chests / Karts'},
+  {id:'buildWall', label:'Build Wall'}, {id:'buildRamp', label:'Build Ramp'},
+  {id:'grapple', label:'Grapple Hook'}, {id:'dance', label:'Dance'}, {id:'inventory', label:'Inventory'},
+  {id:'slot1', label:'Weapon Slot 1'}, {id:'slot2', label:'Weapon Slot 2'}, {id:'slot3', label:'Weapon Slot 3'},
+  {id:'slot4', label:'Weapon Slot 4'}, {id:'slot5', label:'Weapon Slot 5'},
+];
+const KEYBIND_DEFAULTS = { forward:'KeyW', back:'KeyS', left:'KeyA', right:'KeyD', jump:'Space', sprint:'ShiftLeft',
+  crouch:'KeyC', reload:'KeyR', interact:'KeyE', buildWall:'KeyQ', buildRamp:'KeyF', grapple:'KeyG', dance:'KeyV',
+  inventory:'Tab', slot1:'Digit1', slot2:'Digit2', slot3:'Digit3', slot4:'Digit4', slot5:'Digit5' };
+let keybinds = Object.assign({}, KEYBIND_DEFAULTS);
+try{ keybinds = Object.assign({}, KEYBIND_DEFAULTS, JSON.parse(localStorage.getItem('fr_keybinds'))||{}); }catch(e){}
+function saveKeybinds(){ try{ localStorage.setItem('fr_keybinds', JSON.stringify(keybinds)); }catch(e){} }
+function keyLabel(code){
+  if(!code) return '—';
+  if(code.startsWith('Key')) return code.slice(3);
+  if(code.startsWith('Digit')) return code.slice(5);
+  const map={Space:'Space',ShiftLeft:'Shift',ShiftRight:'R Shift',ControlLeft:'Ctrl',ControlRight:'R Ctrl',Tab:'Tab'};
+  return map[code]||code;
+}
+let kbListening=null;   // action id currently waiting for a keypress to rebind, or null
+function renderKeybinds(){
+  const el=$('kbList'); el.innerHTML='';
+  KEYBIND_ACTIONS.forEach(a=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex; align-items:center; justify-content:space-between; gap:10px; background:rgba(255,255,255,.05); border-radius:8px; padding:6px 10px;';
+    const lbl=document.createElement('span'); lbl.textContent=a.label; lbl.style.cssText='font-size:13px; font-weight:700;';
+    const btn=document.createElement('button'); btn.textContent = kbListening===a.id ? '…PRESS A KEY…' : keyLabel(keybinds[a.id]);
+    btn.style.cssText='min-width:90px; padding:6px 10px; border-radius:8px; border:2px solid '+(kbListening===a.id?'#ffe93b':'#7d6bd6')+'; background:#1a1150; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;';
+    btn.onclick=()=>{ kbListening=a.id; renderKeybinds(); };
+    row.appendChild(lbl); row.appendChild(btn); el.appendChild(row);
+  });
+}
+addEventListener('keydown', e=>{
+  if(!kbListening) return;
+  e.preventDefault(); e.stopPropagation();
+  if(e.code!=='Escape') keybinds[kbListening]=e.code;
+  kbListening=null; saveKeybinds(); renderKeybinds();
+}, true);
+$('settingsBtn').onclick=()=>{ kbListening=null; renderKeybinds(); $('settingsOverlay').style.display='flex'; };
+$('kbReset').onclick=()=>{ keybinds=Object.assign({}, KEYBIND_DEFAULTS); saveKeybinds(); renderKeybinds(); };
 const keys={}; let locked=false, mouseDown=false, adsHeld=false, adsOn=false;
 let crouchK=0, touchCrouch=false;
 let joyX=0, joyY=0, touchFire=false;   // virtual stick + fire button (touch)
@@ -1716,18 +1761,18 @@ addEventListener('keydown', e=>{
   if(hsOpen){ hsKey(e); return; }                     // arcade initials panel captures input
   if(spectating){ if(performance.now()-specStart>3000) showEnd(deathTitle,deathStats); return; }
   keys[e.code]=true;
-  if(e.code==='Digit1') switchSlot(0);
-  if(e.code==='Digit2') switchSlot(1);
-  if(e.code==='Digit3') switchSlot(2);
-  if(e.code==='Digit4') switchSlot(3);
-  if(e.code==='Digit5') switchSlot(4);
-  if(e.code==='KeyR') reload();
-  if(e.code==='KeyE'){ if(inKart) exitKart(); else tryInteract(); }
-  if(e.code==='KeyQ') placeStructure('wall');
-  if(e.code==='KeyF') placeStructure('ramp');
-  if(e.code==='KeyG') fireGrapple();
-  if(e.code==='KeyV') dance();
-  if(e.code==='Tab'){ e.preventDefault(); if(running&&!gameOver&&player.alive&&!spectating) toggleInvOverlay(); }
+  if(e.code===keybinds.slot1) switchSlot(0);
+  if(e.code===keybinds.slot2) switchSlot(1);
+  if(e.code===keybinds.slot3) switchSlot(2);
+  if(e.code===keybinds.slot4) switchSlot(3);
+  if(e.code===keybinds.slot5) switchSlot(4);
+  if(e.code===keybinds.reload) reload();
+  if(e.code===keybinds.interact){ if(inKart) exitKart(); else tryInteract(); }
+  if(e.code===keybinds.buildWall) placeStructure('wall');
+  if(e.code===keybinds.buildRamp) placeStructure('ramp');
+  if(e.code===keybinds.grapple) fireGrapple();
+  if(e.code===keybinds.dance) dance();
+  if(e.code===keybinds.inventory){ e.preventDefault(); if(running&&!gameOver&&player.alive&&!spectating) toggleInvOverlay(); }
 });
 function toggleInvOverlay(){
   paused=!paused;
@@ -2615,6 +2660,9 @@ function mpJoinRoom(code, asHost){
   ch.on('broadcast',{event:'state'},({payload})=>{ if(payload.id!==mpPlayerId) mpApplyPlayerState(payload); });
   ch.on('broadcast',{event:'host'},({payload})=>{ if(!mpIsHost) mpApplyHostState(payload); });
   ch.on('broadcast',{event:'start'},({payload})=>{ if(!mpIsHost) beginMatch(payload); });
+  ch.on('broadcast',{event:'end'},()=>{   // WAVE3: guaranteed win signal — see mpBroadcastEnd for why this can't just rely on mpBroadcastHostState
+    if(!mpIsHost){ for(const b of bots) b.alive=false; updateAlive(); }
+  });
   ch.subscribe(async (status)=>{
     if(status==='SUBSCRIBED'){
       await ch.track({name:(players[activeP]&&players[activeP].name)||'Player', host:mpIsHost, outfit:currentOutfit});
@@ -2681,6 +2729,15 @@ function mpBroadcastState(now){
   mpChannel.send({type:'broadcast', event:'state', payload:{
     id:mpPlayerId, x:player.pos.x, y:player.pos.y-EYE, z:player.pos.z, yaw:mpFacingYaw, alive:player.alive,
     moving: moveSpd>.3 }});
+}
+function mpBroadcastEnd(){
+  // WAVE3: mpBroadcastHostState stops firing forever the instant gameOver flips true (its own loop guard),
+  // so the one host-state packet carrying the last bot's death is the ONLY chance joiners ever get to
+  // learn the match ended — if it's dropped or lands inside the 130ms throttle window, they're stuck
+  // forever. Fire a dedicated, payload-free 'end' event a few times over ~1.6s for redundancy instead.
+  let tries=0;
+  const send=()=>{ if(!mpChannel) return; mpChannel.send({type:'broadcast', event:'end', payload:{}}); if(++tries<5) setTimeout(send,400); };
+  send();
 }
 function mpBroadcastHostState(now){
   if(!mpChannel || !mpIsHost || now-mpLastHostSend<130) return;   // ~7-8Hz
@@ -2992,6 +3049,7 @@ function win(){
   if(gameOver) return;
   if(!player.alive){ showEnd(deathTitle,deathStats); return; }   // match ended while spectating
   gameOver=true;
+  if(mpChannel && mpIsHost) mpBroadcastEnd();
   setTimeout(()=>{ document.exitPointerLock();
     $('endTitle').textContent='#1 VICTORY ROYALE';
     const acc = stats.shots?Math.round(100*stats.hits/stats.shots):0;
@@ -3328,7 +3386,7 @@ function loop(){
     if(player.adrT>0){ player.adrT-=dt; if(player.adrT<=0) showMsg('⚡ Adrenaline worn off'); }
     $('fxHud').textContent = (player.cloakT>0?'👻 '+Math.ceil(player.cloakT)+'s  ':'') + (player.adrT>0?'⚡ '+Math.ceil(player.adrT)+'s  ':'') + (player.slimeT>0?'🟢 SLIMED ':'') + (cheatNames.length?'  🕹 '+cheatNames.join(' · '):'');
     // crouch: smooth duck (Ctrl/C or 🦆), halves speed, lowers eye + bots aim at the ducked head
-    const wantC = ((keys['ControlLeft']||keys['ControlRight']||keys['KeyC']||touchCrouch) && !inKart && player.alive) ? 1 : 0;
+    const wantC = ((keys['ControlLeft']||keys['ControlRight']||keys[keybinds.crouch]||touchCrouch) && !inKart && player.alive) ? 1 : 0;
     crouchK += (wantC-crouchK)*Math.min(1,dt*10);
     // sniper ADS: fov lerp + scope overlay
     adsOn = adsHeld && !spectating && !inKart && player.alive && inv[activeSlot] && inv[activeSlot].key==='sniper';
@@ -3360,10 +3418,10 @@ function loop(){
       const f=new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
       const r=new THREE.Vector3(-f.z,0,f.x);
       let wish=new THREE.Vector3();
-      if(keys['KeyW'])wish.add(f); if(keys['KeyS'])wish.sub(f);
-      if(keys['KeyD'])wish.add(r); if(keys['KeyA'])wish.sub(r);
+      if(keys[keybinds.forward])wish.add(f); if(keys[keybinds.back])wish.sub(f);
+      if(keys[keybinds.right])wish.add(r); if(keys[keybinds.left])wish.sub(r);
       if(isTouch&&(joyX||joyY)) wish.addScaledVector(f,-joyY).addScaledVector(r,joyX);
-      let speed=(keys['ShiftLeft']||keys['ShiftRight']||(isTouch&&Math.hypot(joyX,joyY)>.82))?SPRINT:SPEED;
+      let speed=(keys[keybinds.sprint]||keys['ShiftRight']||(isTouch&&Math.hypot(joyX,joyY)>.82))?SPRINT:SPEED;
       if(player.adrT>0) speed*=1.5;
       speed*=(1-.5*crouchK);
       if(player.slowT>0) speed*=.45;
@@ -3372,7 +3430,7 @@ function loop(){
       if(wish.lengthSq()>0) wish.normalize().multiplyScalar(speed);
       player.vel.x=wish.x; player.vel.z=wish.z;
       player.vel.y-=GRAV*gravMult*dt;
-      if(keys['Space']&&player.onGround){ player.vel.y=JUMP*jumpMult; player.onGround=false; }
+      if(keys[keybinds.jump]&&player.onGround){ player.vel.y=JUMP*jumpMult; player.onGround=false; }
       const np=player.pos.clone().addScaledVector(player.vel,dt);
       const feet=player.pos.y-EYE;
       const tryX=player.pos.clone(); tryX.x=np.x; if(!collides(tryX,.5,feet)) player.pos.x=np.x;
@@ -3602,8 +3660,8 @@ if(isTouch){
   $('btnFire').addEventListener('touchstart', e=>{ e.preventDefault(); touchFire=true; }, {passive:false});
   $('btnFire').addEventListener('touchend', ()=>touchFire=false);
   $('btnFire').addEventListener('touchcancel', ()=>touchFire=false);
-  $('btnJump').addEventListener('touchstart', e=>{ e.preventDefault(); keys['Space']=true; }, {passive:false});
-  $('btnJump').addEventListener('touchend', ()=>keys['Space']=false);
+  $('btnJump').addEventListener('touchstart', e=>{ e.preventDefault(); keys[keybinds.jump]=true; }, {passive:false});
+  $('btnJump').addEventListener('touchend', ()=>keys[keybinds.jump]=false);
   $('btnE').addEventListener('touchstart', e=>{ e.preventDefault(); if(inKart) exitKart(); else tryInteract(); }, {passive:false});
   $('btnBag').addEventListener('touchstart', e=>{ e.preventDefault(); if(running&&!gameOver&&player.alive&&!spectating) toggleInvOverlay(); }, {passive:false});
   $('btnWall').addEventListener('touchstart', e=>{ e.preventDefault(); placeStructure('wall'); }, {passive:false});
