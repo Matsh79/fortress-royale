@@ -118,6 +118,18 @@ html, body { overscroll-behavior:none; }
     text-align:center; letter-spacing:5px; pointer-events:none; }
   @keyframes cheatPop { 0%{transform:scaleY(.05); opacity:1} 10%{transform:scaleY(1)} 80%{opacity:1} 100%{opacity:0} }
 
+  /* ---------- PARTY CHAT ---------- */
+  #chatBox { position:fixed; left:24px; bottom:24px; width:280px; max-width:44vw; z-index:60; display:none; }
+  #chatLog { max-height:150px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:3px; margin-bottom:6px; padding-right:2px; }
+  .chatMsg { color:#e8e2ff; font-size:12.5px; font-weight:600; background:rgba(10,5,35,.6); padding:4px 9px; border-radius:7px; word-break:break-word; }
+  .chatMsg b { color:#6fd4ff; }
+  .chatMsg.chatSys { color:#ffe27a; font-style:italic; background:rgba(80,30,140,.4); }
+  #chatInputRow { display:flex; gap:6px; }
+  #chatInput { flex:1; min-width:0; padding:7px 10px; border-radius:8px; border:2px solid rgba(111,212,255,.5);
+    background:rgba(10,5,35,.8); color:#e8e2ff; font-size:13px; font-family:inherit; outline:none; }
+  #chatInput::placeholder { color:#9f95d6; }
+  #chatSendBtn { padding:7px 12px; border:none; border-radius:8px; background:#ffb400; color:#4a2d00; font-weight:900; cursor:pointer; font-size:13px; }
+
   /* ---------- ARCADE HIGH-SCORE INITIALS ---------- */
   #hsPanel { display:none; position:fixed; inset:0; z-index:50; align-items:center; justify-content:center;
     background:rgba(6,3,22,.93); font-family:'Courier New',monospace; }
@@ -354,6 +366,13 @@ html, body { overscroll-behavior:none; }
   </div>
 </div>
 <div id="cheatToast"></div>
+<div id="chatBox">
+  <div id="chatLog"></div>
+  <div id="chatInputRow">
+    <input id="chatInput" type="text" maxlength="140" placeholder="Press Enter to chat…" autocomplete="off">
+    <button id="chatSendBtn" type="button">Send</button>
+  </div>
+</div>
 <div id="hsPanel">
   <div class="hsBox">
     <div id="hsTitle">★ NEW HIGH SCORE! ★</div>

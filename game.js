@@ -301,6 +301,7 @@ function completeLogin(){
   savePlayers(); applyPlayer(); renderPlayers();
   $('loginOverlay').style.display='none';
   updateAdminBtn();
+  chatShow(true); $('chatLog').innerHTML=''; chatLine('💬 chat ready — type a message, or paste an admin code!', true);
 }
 function logOut(){
   loggedIn=false; try{ localStorage.removeItem('fr_login'); }catch(e){}
@@ -310,6 +311,7 @@ function logOut(){
   $('adminOverlay').style.display='none';
   $('loginOverlay').style.display='flex';
   updateAdminBtn();
+  chatShow(false);
   $('loginUser').focus();
 }
 window.logOut=logOut;
@@ -2562,6 +2564,7 @@ function hitDirIndicator(srcPos){
 function damagePlayer(d,from,srcPos){
   if(!player.alive) return;
   if(cheats.god) return;   // IDDQD
+  if(cheats.turtle) d*=.5;   // TURTLEPOWER
   if(grace>0 && from!=='the Storm') return;
   player.lastHitT=performance.now();
   sfx('hurt');
@@ -2649,6 +2652,7 @@ function mpLeaveRoom(){
   for(const id in netPlayers){ scene.remove(netPlayers[id].mesh); delete netPlayers[id]; }
   mpRoomCode=null; mpIsHost=true; mpPlayerId=null;
   mpUpdatePlayBtn();
+  if(loggedIn) chatLine('💬 left the party — chat is just you now (still works for pasting codes!)', true);
 }
 function mpJoinRoom(code, asHost){
   if(!window.supabase){ showMsg('❌ Multiplayer unavailable — could not load networking library',1800); return; }
@@ -2663,12 +2667,14 @@ function mpJoinRoom(code, asHost){
   ch.on('broadcast',{event:'end'},()=>{   // WAVE3: guaranteed win signal — see mpBroadcastEnd for why this can't just rely on mpBroadcastHostState
     if(!mpIsHost){ for(const b of bots) b.alive=false; updateAlive(); }
   });
+  ch.on('broadcast',{event:'chat'},({payload})=>{ chatLine(`<b>${escapeHtml(payload.name)}:</b> ${escapeHtml(payload.text)}`); });
   ch.subscribe(async (status)=>{
     if(status==='SUBSCRIBED'){
       await ch.track({name:(players[activeP]&&players[activeP].name)||'Player', host:mpIsHost, outfit:currentOutfit});
       $('mpStatus').textContent = asHost ? '🌐 Room '+code+' — waiting for friends…' : '🌐 Joined room '+code;
       showMsg(asHost ? '🌐 ROOM '+code+' CREATED — share the code!' : '🌐 JOINED ROOM '+code, 2200);
       mpUpdatePlayBtn();
+      chatShow(true); $('chatLog').innerHTML=''; chatLine('💬 party chat connected — say hi!', true);
     } else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT'){
       $('mpStatus').textContent='❌ Connection failed — try again';
     }
@@ -2825,8 +2831,9 @@ $('lbBtn').onclick = async ()=>{ $('lbOverlay').style.display='flex'; $('lbList'
 // ---------- cheat codes ----------
 let cheated=false, cheatBuf='';
 let gravMult=1, jumpMult=1;
-const cheats={god:false, bighead:false, moon:false};
+const cheats={god:false, bighead:false, moon:false, banana:false, rocket:false, turtle:false};
 const cheatNames=[];
+const CHEAT_CODES=['IDDQD','IDKFA','BIGHEAD','MOONMAN','HANSOLO','BANANARAMA','ROCKETSHOES','TURTLEPOWER','DUCKSTORM'];   // admin prank codes — typeable OR paste-into-chat
 const pendingCheats=[];   // IDKFA/HANSOLO typed in lobby apply after invReset at match start
 function cheatJingle(){ try{
   ac = ac||new AC();
@@ -2848,6 +2855,29 @@ function victoryJingle(){ try{
     o.start(t+d); o.stop(t+d+.32);
   });
 }catch(e){} }
+function duckStorm(){   // DUCKSTORM: pure prank, no gameplay effect — just chaos on screen
+  try{
+    ac = ac||new AC();
+    const t=ac.currentTime;
+    [[300,0],[260,.08],[320,.16],[260,.24]].forEach(([f,d])=>{
+      const o=ac.createOscillator(), g=ac.createGain();
+      o.type='sawtooth'; o.frequency.value=f; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(.12,t+d); g.gain.exponentialRampToValueAtTime(.001,t+d+.1);
+      o.start(t+d); o.stop(t+d+.12);
+    });
+  }catch(e){}
+  for(let i=0;i<24;i++){
+    setTimeout(()=>{
+      const d=document.createElement('div');
+      d.textContent='🦆';
+      d.style.cssText=`position:fixed; top:-40px; left:${rand(0,100)}vw; font-size:${rand(22,46)}px; z-index:9999;
+        pointer-events:none; transition:top 2.2s linear, transform 2.2s linear; transform:rotate(${rand(-40,40)}deg);`;
+      document.body.appendChild(d);
+      requestAnimationFrame(()=>{ d.style.top='110vh'; });
+      setTimeout(()=>d.remove(),2400);
+    }, i*60);
+  }
+}
 let cheatToastTO=0;
 function cheatToast(txt){
   const d=$('cheatToast');
@@ -2868,6 +2898,10 @@ function activateCheat(code){
   else if(code==='BIGHEAD'){ if(cheats.bighead) return; cheats.bighead=true; markCheat('BIGHEAD'); for(const b of bots) b.head.scale.setScalar(2.2); cheatToast('★ CHEAT ACTIVATED: BIG HEAD MODE ★'); }
   else if(code==='MOONMAN'){ if(cheats.moon) return; cheats.moon=true; cheated=true; markCheat('MOON'); gravMult=.5; jumpMult=1.5; cheatToast('★ CHEAT ACTIVATED: MOON GRAVITY ★'); }
   else if(code==='HANSOLO'){ cheated=true; markCheat('HANSOLO'); if(running) applyHanSolo(); else if(!pendingCheats.includes(applyHanSolo)) pendingCheats.push(applyHanSolo); cheatToast('★ CHEAT ACTIVATED: GOLDEN DEAGLES ★'); }
+  else if(code==='BANANARAMA'){ if(cheats.banana) return; cheats.banana=true; cheated=true; markCheat('BANANA'); cheatToast('🍌 CHEAT ACTIVATED: BANANA ZOOM 🍌'); }
+  else if(code==='ROCKETSHOES'){ if(cheats.rocket) return; cheats.rocket=true; cheated=true; markCheat('ROCKET'); cheatToast('🚀 CHEAT ACTIVATED: ROCKET SHOES 🚀'); }
+  else if(code==='TURTLEPOWER'){ if(cheats.turtle) return; cheats.turtle=true; cheated=true; markCheat('TURTLE'); cheatToast('🐢 CHEAT ACTIVATED: TURTLE SHELL (half damage) 🐢'); }
+  else if(code==='DUCKSTORM'){ markCheat('DUCKS'); duckStorm(); cheatToast('🦆 CHEAT ACTIVATED: QUACK ATTACK 🦆'); return; }   // pure prank — no jingle, duckStorm has its own sound
   else return;
   cheatJingle();
 }
@@ -2876,8 +2910,8 @@ addEventListener('keydown', e=>{
   if(tg && (tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.tagName==='SELECT'||tg.isContentEditable)) return;
   if(hsOpen) return;                            // don't fire cheats while typing initials
   if(!/^[a-zA-Z]$/.test(e.key)) return;
-  cheatBuf=(cheatBuf+e.key.toUpperCase()).slice(-10);
-  for(const c of ['IDDQD','IDKFA','BIGHEAD','MOONMAN','HANSOLO'])
+  cheatBuf=(cheatBuf+e.key.toUpperCase()).slice(-12);
+  for(const c of CHEAT_CODES)
     if(cheatBuf.endsWith(c)){ activateCheat(c); cheatBuf=''; break; }
 });
 // KONAMI code on the login screen: ↑↑↓↓←→←→BA bypasses the password
@@ -2898,6 +2932,42 @@ addEventListener('keydown', e=>{
       cheatToast('⭐ 30 LIVES!'); cheatJingle();
     }
   } else konIx = (k===KONAMI[0]) ? 1 : 0;
+});
+
+// ---------- party chat + admin code paste box (always available once logged in; broadcasts to party if one exists) ----------
+function escapeHtml(s){ return (s+'').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+function chatShow(show){ $('chatBox').style.display = show ? 'block' : 'none'; }
+function chatLine(html, sys){
+  const d=document.createElement('div'); d.className='chatMsg'+(sys?' chatSys':'');
+  d.innerHTML=html;
+  $('chatLog').prepend(d);
+  while($('chatLog').children.length>40) $('chatLog').lastChild.remove();
+}
+function chatSend(){
+  const inp=$('chatInput');
+  const text=inp.value.trim();
+  inp.value=''; inp.blur();
+  if(!text) return;
+  const code=text.toUpperCase().replace(/[^A-Z]/g,'');
+  if(CHEAT_CODES.includes(code)){ activateCheat(code); return; }   // admin codes activate locally, never posted to chat
+  const name=(player.name||'Player').slice(0,16);
+  chatLine(`<b>${escapeHtml(name)}:</b> ${escapeHtml(text)}`);
+  if(mpChannel) mpChannel.send({type:'broadcast', event:'chat', payload:{name, text}});
+}
+$('chatSendBtn').onclick=chatSend;
+$('chatInput').addEventListener('keydown', e=>{
+  e.stopPropagation();   // don't let WASD/slot-switch/etc fire while typing a message
+  if(e.key==='Enter'){ e.preventDefault(); chatSend(); }
+  else if(e.key==='Escape'){ e.preventDefault(); $('chatInput').value=''; $('chatInput').blur(); }
+});
+$('chatInput').addEventListener('focus', ()=>{ if(!isTouch) document.exitPointerLock(); });
+$('chatInput').addEventListener('blur', ()=>{ if(!isTouch && running && !paused && !gameOver && !spectating) lockPtr(); });
+addEventListener('keydown', e=>{   // Enter opens chat any time you're logged in (solo or in a party)
+  if(e.key!=='Enter' || $('chatBox').style.display==='none' || hsOpen || kbListening) return;
+  const tg=e.target;
+  if(tg && (tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.isContentEditable)) return;
+  e.preventDefault();
+  $('chatInput').focus();
 });
 
 // ---------- arcade high-score initials ----------
@@ -3427,10 +3497,11 @@ function loop(){
       if(player.slowT>0) speed*=.45;
       if(player.slimeT>0) speed*=.33;
       if(adsOn) speed*=.4;   // scoped = slow walk
+      if(cheats.banana) speed*=1.8;   // BANANARAMA
       if(wish.lengthSq()>0) wish.normalize().multiplyScalar(speed);
       player.vel.x=wish.x; player.vel.z=wish.z;
       player.vel.y-=GRAV*gravMult*dt;
-      if(keys[keybinds.jump]&&player.onGround){ player.vel.y=JUMP*jumpMult; player.onGround=false; }
+      if(keys[keybinds.jump]&&player.onGround){ player.vel.y=JUMP*jumpMult*(cheats.rocket?1.7:1); player.onGround=false; }
       const np=player.pos.clone().addScaledVector(player.vel,dt);
       const feet=player.pos.y-EYE;
       const tryX=player.pos.clone(); tryX.x=np.x; if(!collides(tryX,.5,feet)) player.pos.x=np.x;
