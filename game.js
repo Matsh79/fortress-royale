@@ -163,10 +163,53 @@ function buildOutfitPicker(containerId, arr, pl, slot){   // WAVE3: reused for h
   arr.forEach((o,oi)=>{
     const b=document.createElement('button'); b.textContent=o.emoji; b.title=o.name;
     b.style.cssText='font-size:16px; padding:3px 7px; border-radius:8px; cursor:pointer; background:rgba(255,255,255,.08); border:2px solid '+(oi===(pl.outfit[slot]||0)?'#ffe93b':'transparent');
-    b.onclick=(e)=>{ e.preventDefault(); pl.outfit[slot]=oi; [...el.children].forEach((x,xj)=>x.style.borderColor = xj===oi?'#ffe93b':'transparent'); };
+    b.onclick=(e)=>{ e.preventDefault(); pl.outfit[slot]=oi; [...el.children].forEach((x,xj)=>x.style.borderColor = xj===oi?'#ffe93b':'transparent'); buildPreviewOutfit(pl); };
     el.appendChild(b);
   });
 }
+// ---------- WAVE3: live 3D mannequin preview while customizing (mirrors makeBot's cosmetic attachment) ----------
+let previewRenderer=null, previewScene=null, previewCamera=null, previewGroup=null, previewSpin=0, previewRAF=null;
+function ensurePreview(){
+  if(previewRenderer) return;
+  const canvas=$('peOutfitPreview');
+  previewRenderer=new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  previewRenderer.setSize(260,260,false);
+  previewScene=new THREE.Scene();
+  previewCamera=new THREE.PerspectiveCamera(34,1,0.1,20);
+  previewCamera.position.set(0,1.5,4.4);
+  previewCamera.lookAt(0,1.1,0);
+  previewScene.add(new THREE.AmbientLight(0xffffff,0.95));
+  const dl=new THREE.DirectionalLight(0xffffff,0.6); dl.position.set(2,4,3); previewScene.add(dl);
+}
+function buildPreviewOutfit(pl){
+  ensurePreview();
+  if(previewGroup) previewScene.remove(previewGroup);
+  const outfit=pl.outfit||defaultOutfit();
+  const g=new THREE.Group();
+  const bodyMat=toonMat({color:new THREE.Color(CHAR_COLORS[pl.char||0].color)});
+  const torso=new THREE.Mesh(BOTGEO.torso, bodyMat); torso.position.y=1.35;
+  const head=new THREE.Mesh(BOTGEO.head, botHeadMats[0]); head.position.y=2.18;
+  const limb=(geo,mat,px,py,oy)=>{ const piv=new THREE.Group(); piv.position.set(px,py,0);
+    const m=new THREE.Mesh(geo,mat); m.position.y=oy; piv.add(m); g.add(piv); return piv; };
+  const pantsMat = outfit.pants ? toonMat({color:new THREE.Color(PANTS[outfit.pants].color)}) : botPantsMat;
+  const legL=limb(BOTGEO.leg, pantsMat, -.21, .92, -.45);
+  const legR=limb(BOTGEO.leg, pantsMat,  .21, .92, -.45);
+  limb(BOTGEO.arm, bodyMat, -.52, 1.8, -.38);
+  limb(BOTGEO.arm, bodyMat,  .52, 1.8, -.38);
+  g.add(torso,head);
+  if(outfit.shirt){ const shirt=new THREE.Mesh(new THREE.BoxGeometry(.86,1.08,.5), toonMat({color:new THREE.Color(SHIRTS[outfit.shirt].color)})); torso.add(shirt); }
+  if(outfit.hat){ const hat=new THREE.Mesh(new THREE.BoxGeometry(.5,.28,.5), toonMat({color:new THREE.Color(HATS[outfit.hat].color)})); hat.position.set(0,.42,0); head.add(hat); }
+  if(outfit.glasses){ const glasses=new THREE.Mesh(new THREE.BoxGeometry(.48,.14,.06), toonMat({color:new THREE.Color(GLASSES[outfit.glasses].color)})); glasses.position.set(0,-.03,.32); head.add(glasses); }
+  if(outfit.socks){ const sockMat=toonMat({color:new THREE.Color(SOCKS[outfit.socks].color)});
+    [legL,legR].forEach(piv=>{ const sock=new THREE.Mesh(new THREE.BoxGeometry(.3,.22,.3), sockMat); sock.position.set(0,-.8,0); piv.add(sock); }); }
+  previewGroup=g; previewScene.add(g);
+  if(!previewRAF) previewTick();
+}
+function previewTick(){
+  if(previewGroup){ previewSpin+=0.012; previewGroup.rotation.y=previewSpin; previewRenderer.render(previewScene, previewCamera); }
+  previewRAF=requestAnimationFrame(previewTick);
+}
+function stopPreview(){ if(previewRAF){ cancelAnimationFrame(previewRAF); previewRAF=null; } }
 function openEditor(i){
   editingP=i; const pl=players[i];
   if(!pl.outfit) pl.outfit=defaultOutfit();
@@ -176,7 +219,7 @@ function openEditor(i){
   CHAR_COLORS.forEach((c,ci)=>{
     const b=document.createElement('button'); b.textContent=c.emoji;
     b.style.cssText='font-size:20px; padding:4px 8px; border-radius:8px; cursor:pointer; background:rgba(255,255,255,.08); border:2px solid '+(ci===(pl.char||0)?'#ffe93b':'transparent');
-    b.onclick=(e)=>{ e.preventDefault(); pl.char=ci; [...$('peChars').children].forEach((x,xj)=>x.style.borderColor = xj===ci?'#ffe93b':'transparent'); };
+    b.onclick=(e)=>{ e.preventDefault(); pl.char=ci; [...$('peChars').children].forEach((x,xj)=>x.style.borderColor = xj===ci?'#ffe93b':'transparent'); buildPreviewOutfit(pl); };
     $('peChars').appendChild(b);
   });
   buildOutfitPicker('peHat', HATS, pl, 'hat');
@@ -184,6 +227,7 @@ function openEditor(i){
   buildOutfitPicker('peShirt', SHIRTS, pl, 'shirt');
   buildOutfitPicker('pePants', PANTS, pl, 'pants');
   buildOutfitPicker('peSocks', SOCKS, pl, 'socks');
+  buildPreviewOutfit(pl);
 }
 $('pePhoto').addEventListener('change', e=>{
   const f=e.target.files[0]; if(!f||editingP<0) return;
@@ -204,14 +248,14 @@ $('peSave').onclick=(e)=>{ e.preventDefault();
   players[editingP].age=$('peAge').value?parseInt($('peAge').value):'';
   players[editingP].diff=parseInt($('peDiff').value);
   if(loggedIn && editingP===activeP) persistLogin();   // keep persisted login in sync with rename
-  savePlayers(); $('pEditor').style.display='none'; editingP=-1;
+  savePlayers(); $('pEditor').style.display='none'; editingP=-1; stopPreview();
   applyPlayer(); renderPlayers();
 };
 $('peDel').onclick=(e)=>{ e.preventDefault();
   if(editingP<0||players.length<=1) return;
   const wasSelf = editingP===activeP;
   players.splice(editingP,1); activeP=0; editingP=-1;
-  savePlayers(); $('pEditor').style.display='none'; applyPlayer(); renderPlayers();
+  savePlayers(); $('pEditor').style.display='none'; stopPreview(); applyPlayer(); renderPlayers();
   if(loggedIn && wasSelf) logOut();
 };
 
