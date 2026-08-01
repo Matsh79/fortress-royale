@@ -84,10 +84,30 @@ const CHAR_COLORS = [
   {emoji:'🍌', color:'#ffd21f'}, {emoji:'🥷', color:'#3b3b52'}, {emoji:'🚀', color:'#28a7ff'},
   {emoji:'🤖', color:'#9aa7b5'}, {emoji:'🏴‍☠️', color:'#ff5e5e'}, {emoji:'🧙', color:'#c26bff'},
 ];
+// WAVE3: premade cosmetic slots — a little personalization, visible to friends in multiplayer
+const HATS = [
+  {emoji:'🚫', name:'None'}, {emoji:'🧢', name:'Cap', color:'#e0442b'}, {emoji:'🎩', name:'Top Hat', color:'#1a1a22'},
+  {emoji:'🪖', name:'Helmet', color:'#5a6b4a'}, {emoji:'🎉', name:'Party', color:'#c26bff'},
+];
+const GLASSES = [
+  {emoji:'🚫', name:'None'}, {emoji:'🕶️', name:'Shades', color:'#111318'}, {emoji:'🥽', name:'Goggles', color:'#3fa9ff'},
+];
+const SHIRTS = [
+  {emoji:'⬜', name:'Default'}, {emoji:'🟥', name:'Red', color:'#e0442b'}, {emoji:'🟦', name:'Blue', color:'#2b6ee0'},
+  {emoji:'🟩', name:'Green', color:'#3fae4a'}, {emoji:'🟨', name:'Yellow', color:'#ffd21f'}, {emoji:'🟪', name:'Purple', color:'#c26bff'},
+];
+const PANTS = [
+  {emoji:'⬜', name:'Default'}, {emoji:'⬛', name:'Black', color:'#22232b'}, {emoji:'🟦', name:'Navy', color:'#233a66'},
+  {emoji:'🟫', name:'Khaki', color:'#8a7a51'}, {emoji:'🟩', name:'Camo', color:'#4a5a3a'},
+];
+const SOCKS = [
+  {emoji:'🚫', name:'None'}, {emoji:'⬜', name:'White', color:'#eef1f5'}, {emoji:'🟥', name:'Red', color:'#e0442b'}, {emoji:'🟨', name:'Yellow', color:'#ffd21f'},
+];
+function defaultOutfit(){ return {hat:0, glasses:0, shirt:0, pants:0, socks:0}; }
 const DEFAULT_PLAYERS = [
-  { name:'Mats', age:'', photo:'', char:2, diff:1 },
-  { name:'Guy',  age:'', photo:'', char:4, diff:2 },
-  { name:'Mika', age:12, photo:'', char:1, diff:1 },
+  { name:'Mats', age:'', photo:'', char:2, diff:1, outfit:defaultOutfit() },
+  { name:'Guy',  age:'', photo:'', char:4, diff:2, outfit:defaultOutfit() },
+  { name:'Mika', age:12, photo:'', char:1, diff:1, outfit:defaultOutfit() },
 ];
 let players = [], activeP = 0, editingP = -1, loggedIn = false;
 try { players = JSON.parse(localStorage.getItem('fr_players')) || []; } catch(e){ players = []; }
@@ -98,13 +118,16 @@ players.forEach(p=>{
   const nm=(p.name||'').trim().toLowerCase();
   if(nm==='mika') p.admin=true;
   p.admin=!!p.admin;
+  if(!p.outfit) p.outfit=defaultOutfit();   // WAVE3: migrate profiles saved before cosmetics existed
 });
 activeP = clamp(parseInt(localStorage.getItem('fr_activeP')||'0')||0, 0, players.length-1);
 function savePlayers(){ try { localStorage.setItem('fr_players', JSON.stringify(players)); localStorage.setItem('fr_activeP', activeP); } catch(e){} }
+let currentOutfit = defaultOutfit();   // WAVE3: active profile's cosmetic picks — read when building your own multiplayer avatar
 function applyPlayer(){
   const pl = players[activeP]; if(!pl) return;
   $('pname').value = pl.name;
   skinColor = CHAR_COLORS[pl.char||0].color;
+  currentOutfit = pl.outfit || defaultOutfit();
   diffIx = pl.diff!==undefined ? pl.diff : 1;
   [...$('diffs').children].forEach((x,j)=>x.style.borderColor = j===diffIx?'#ffe93b':'rgba(255,255,255,.25)');
 }
@@ -125,7 +148,7 @@ function renderPlayers(){
   if(!loggedIn && players.length<4){
     const add=document.createElement('div'); add.className='pcard';
     add.innerHTML='<div class="av">＋</div><div class="pn">Add</div><div class="pa">new player</div>';
-    add.onclick=()=>{ players.push({name:'Player'+(players.length+1), age:'', photo:'', char:0, diff:1, pwd:'password', admin:false}); activeP=players.length-1; savePlayers(); renderPlayers(); openEditor(activeP); };
+    add.onclick=()=>{ players.push({name:'Player'+(players.length+1), age:'', photo:'', char:0, diff:1, pwd:'password', admin:false, outfit:defaultOutfit()}); activeP=players.length-1; savePlayers(); renderPlayers(); openEditor(activeP); };
     $('players').appendChild(add);
   }
   if(loggedIn){
@@ -135,8 +158,18 @@ function renderPlayers(){
     $('players').appendChild(sw);
   }
 }
+function buildOutfitPicker(containerId, arr, pl, slot){   // WAVE3: reused for hat/glasses/shirt/pants/socks pickers
+  const el=$(containerId); el.innerHTML='';
+  arr.forEach((o,oi)=>{
+    const b=document.createElement('button'); b.textContent=o.emoji; b.title=o.name;
+    b.style.cssText='font-size:16px; padding:3px 7px; border-radius:8px; cursor:pointer; background:rgba(255,255,255,.08); border:2px solid '+(oi===(pl.outfit[slot]||0)?'#ffe93b':'transparent');
+    b.onclick=(e)=>{ e.preventDefault(); pl.outfit[slot]=oi; [...el.children].forEach((x,xj)=>x.style.borderColor = xj===oi?'#ffe93b':'transparent'); };
+    el.appendChild(b);
+  });
+}
 function openEditor(i){
   editingP=i; const pl=players[i];
+  if(!pl.outfit) pl.outfit=defaultOutfit();
   $('pEditor').style.display='flex';
   $('peName').value=pl.name; $('peAge').value=pl.age||''; $('peDiff').value=pl.diff!==undefined?pl.diff:1;
   $('peChars').innerHTML='';
@@ -146,6 +179,11 @@ function openEditor(i){
     b.onclick=(e)=>{ e.preventDefault(); pl.char=ci; [...$('peChars').children].forEach((x,xj)=>x.style.borderColor = xj===ci?'#ffe93b':'transparent'); };
     $('peChars').appendChild(b);
   });
+  buildOutfitPicker('peHat', HATS, pl, 'hat');
+  buildOutfitPicker('peGlasses', GLASSES, pl, 'glasses');
+  buildOutfitPicker('peShirt', SHIRTS, pl, 'shirt');
+  buildOutfitPicker('pePants', PANTS, pl, 'pants');
+  buildOutfitPicker('peSocks', SOCKS, pl, 'socks');
 }
 $('pePhoto').addEventListener('change', e=>{
   const f=e.target.files[0]; if(!f||editingP<0) return;
@@ -197,7 +235,7 @@ DIFFS.forEach((d,i)=>{
   b.onclick=()=>{ diffIx=i; [...$('diffs').children].forEach((x,j)=>x.style.borderColor = j===i?'#ffe93b':'rgba(255,255,255,.25)'); };
   $('diffs').appendChild(b);
 });
-if(!players.some(p=>p.name.toLowerCase()==='mate')) { players.push({name:'Mate', age:'', photo:'', char:5, diff:1, pwd:'password', admin:false}); }
+if(!players.some(p=>p.name.toLowerCase()==='mate')) { players.push({name:'Mate', age:'', photo:'', char:5, diff:1, pwd:'password', admin:false, outfit:defaultOutfit()}); }
 savePlayers();   // persist WAVE2 migration (pwd/admin) even for stored profiles
 try{
   if(!localStorage.getItem('fr_pwreset1')){
@@ -280,7 +318,7 @@ let suChar=0;
     if(!nm){ $('suErr').textContent='❌ You need a name, recruit.'; return; }
     if(players.some(p=>p.name.trim().toLowerCase()===nm.toLowerCase())){ $('suErr').textContent='❌ That soldier already exists. Log in instead.'; return; }
     players.push({ name:nm.slice(0,14), age:$('suAge').value?parseInt($('suAge').value):'', photo:'', char:suChar, diff:1,
-      pwd:$('suPw').value||'password', admin:false });
+      pwd:$('suPw').value||'password', admin:false, outfit:defaultOutfit() });
     savePlayers(); renderPlayers();
     $('suForm').style.display='none'; $('suDone').style.display='block';
   };
@@ -379,7 +417,7 @@ $('admNew').onclick=()=>{
   const nm=n.trim().slice(0,14);
   let ix=players.findIndex(p=>p.name.trim().toLowerCase()===nm.toLowerCase());
   if(ix<0){
-    players.push({name:nm, age:'', photo:'', char:(Math.random()*CHAR_COLORS.length)|0, diff:1, pwd:'password', admin:false});
+    players.push({name:nm, age:'', photo:'', char:(Math.random()*CHAR_COLORS.length)|0, diff:1, pwd:'password', admin:false, outfit:defaultOutfit()});
     ix=players.length-1;
     savePlayers(); renderAdmin(); renderPlayers();
   }
@@ -397,7 +435,7 @@ $('admNew').onclick=()=>{
   let ix=players.findIndex(p=>p.name.trim().toLowerCase()===nm.trim().toLowerCase());
   if(ix<0){
     players.push({ name:nm, age:'', photo:'', char:clamp(parseInt(d.c)||0,0,CHAR_COLORS.length-1), diff:1,
-      pwd:String(d.p||'password'), admin:false });
+      pwd:String(d.p||'password'), admin:false, outfit:defaultOutfit() });
     ix=players.length-1;
   }
   savePlayers();
@@ -1540,7 +1578,7 @@ const botFaceMats = [0,1,2].map(v=>{
 });
 // head material arrays: skin on 5 sides, face on +Z (bots lookAt the player, so faces point at you)
 const botHeadMats = botFaceMats.map(f=>[botSkinMat,botSkinMat,botSkinMat,botSkinMat,f,botSkinMat]);
-function makeBot(name){
+function makeBot(name, outfit){
   const g=new THREE.Group();
   const tier=TIERS[pickTier()];
   const col=new THREE.Color(tier.col); col.offsetHSL(rand(-.02,.02),0,rand(-.07,.07));
@@ -1557,11 +1595,34 @@ function makeBot(name){
     const m=new THREE.Mesh(geo,mat); m.position.y=oy; m.castShadow=true;
     piv.add(m); g.add(piv); return piv;
   };
+  const pantsMat = (outfit && outfit.pants) ? toonMat({color:new THREE.Color(PANTS[outfit.pants].color)}) : botPantsMat;
   const armL=limb(BOTGEO.arm, bodyMat, -.52, 1.8, -.38);
   const armR=limb(BOTGEO.arm, bodyMat,  .52, 1.8, -.38);
-  const legL=limb(BOTGEO.leg, botPantsMat, -.21, .92, -.45);
-  const legR=limb(BOTGEO.leg, botPantsMat,  .21, .92, -.45);
+  const legL=limb(BOTGEO.leg, pantsMat, -.21, .92, -.45);
+  const legR=limb(BOTGEO.leg, pantsMat,  .21, .92, -.45);
   g.add(torso,hitbox,head);
+  // WAVE3: premade cosmetics — only real players carry an `outfit`; AI bots keep their tier look
+  if(outfit){
+    if(outfit.shirt){
+      const shirt=new THREE.Mesh(new THREE.BoxGeometry(.86,1.08,.5), toonMat({color:new THREE.Color(SHIRTS[outfit.shirt].color)}));
+      torso.add(shirt);
+    }
+    if(outfit.hat){
+      const hat=new THREE.Mesh(new THREE.BoxGeometry(.5,.28,.5), toonMat({color:new THREE.Color(HATS[outfit.hat].color)}));
+      hat.position.set(0,.42,0); hat.castShadow=true; head.add(hat);
+    }
+    if(outfit.glasses){
+      const glasses=new THREE.Mesh(new THREE.BoxGeometry(.48,.14,.06), toonMat({color:new THREE.Color(GLASSES[outfit.glasses].color)}));
+      glasses.position.set(0,-.03,.32); head.add(glasses);
+    }
+    if(outfit.socks){
+      const sockMat=toonMat({color:new THREE.Color(SOCKS[outfit.socks].color)});
+      [legL,legR].forEach(piv=>{
+        const sock=new THREE.Mesh(new THREE.BoxGeometry(.3,.22,.3), sockMat);
+        sock.position.set(0,-.8,0); piv.add(sock);
+      });
+    }
+  }
   const tagCv=document.createElement('canvas'); tagCv.width=128; tagCv.height=36;
   const tagTex=new THREE.CanvasTexture(tagCv);
   const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:tagTex,transparent:true}));
@@ -1588,11 +1649,14 @@ function drawTag(b){
     cx.fillRect(8,27,240*pct,15);
   } else {
     cx.clearRect(0,0,128,36);
-    cx.fillStyle='rgba(0,0,0,.55)'; cx.fillRect(4,4,120,28);
+    cx.fillStyle='rgba(0,0,0,.55)'; cx.fillRect(2,1,124,15);
+    cx.font='bold 11px Arial'; cx.textAlign='center'; cx.fillStyle='#fff';
+    cx.fillText(b.name, 64, 12);
+    cx.fillStyle='rgba(0,0,0,.55)'; cx.fillRect(4,19,120,15);
     cx.fillStyle = pct>.5?'#41d94d':pct>.25?'#ffb400':'#ff4444';
-    cx.fillRect(6,6,116*pct,15);
-    cx.font='bold 13px Arial'; cx.textAlign='center'; cx.fillStyle='#fff';
-    cx.fillText(hp, 64, 33);
+    cx.fillRect(6,21,116*pct,11);
+    cx.font='bold 11px Arial'; cx.fillStyle='#fff';
+    cx.fillText(hp, 64, 30);
   }
   b.tagTex.needsUpdate=true; b.hpShown=b.hp;
 }
@@ -2115,7 +2179,9 @@ function botThink(b,dt,now){
       }
       if(!b.moving && stormPanic) b.safeSpot=null;   // fully cornered → pick a new safe spot next tick
     }
-    b.mesh.lookAt(player.pos.x,b.mesh.position.y,player.pos.z);
+    // face the direction actually being walked (not the player) — smoothed turn, purely cosmetic (botFire aims independently)
+    const tYaw=Math.atan2(-dir.x,-dir.z), cy=b.mesh.rotation.y;
+    b.mesh.rotation.y = cy + Math.atan2(Math.sin(tYaw-cy), Math.cos(tYaw-cy))*Math.min(1,dt*10);
   }
   // limb swing: advance phase while walking, ease out when stopped (arms/legs opposite phase)
   if(b.moving){ b.phase+=dt*b.speed*1.35; b.swing=Math.min(1,b.swing+dt*6); }
@@ -2480,10 +2546,16 @@ function diffBadge(d){ d=(d||'').toUpperCase(); if(d.startsWith('PIECE'))return 
 let mpChannel=null, mpIsHost=true, mpRoomCode=null, mpPlayerId=null, mpLastSend=0, mpLastHostSend=0;
 const netPlayers={};   // id -> networked friend avatar (built from makeBot, driven by broadcasts instead of AI)
 function mpGenRoomCode(){ const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=A[Math.floor(Math.random()*A.length)]; return s; }
+function mpUpdatePlayBtn(){   // WAVE3: only the party leader may start the match
+  const waiting = !!mpChannel && !mpIsHost;
+  $('playBtn').style.display = waiting ? 'none' : 'block';
+  $('mpWaitMsg').style.display = waiting ? 'block' : 'none';
+}
 function mpLeaveRoom(){
   if(mpChannel){ try{ mpChannel.unsubscribe(); }catch(e){} mpChannel=null; }
   for(const id in netPlayers){ scene.remove(netPlayers[id].mesh); delete netPlayers[id]; }
   mpRoomCode=null; mpIsHost=true; mpPlayerId=null;
+  mpUpdatePlayBtn();
 }
 function mpJoinRoom(code, asHost){
   if(!window.supabase){ showMsg('❌ Multiplayer unavailable — could not load networking library',1800); return; }
@@ -2494,11 +2566,13 @@ function mpJoinRoom(code, asHost){
   ch.on('presence',{event:'sync'},()=>mpSyncPresence(ch));
   ch.on('broadcast',{event:'state'},({payload})=>{ if(payload.id!==mpPlayerId) mpApplyPlayerState(payload); });
   ch.on('broadcast',{event:'host'},({payload})=>{ if(!mpIsHost) mpApplyHostState(payload); });
+  ch.on('broadcast',{event:'start'},({payload})=>{ if(!mpIsHost) beginMatch(payload); });
   ch.subscribe(async (status)=>{
     if(status==='SUBSCRIBED'){
-      await ch.track({name:(players[activeP]&&players[activeP].name)||'Player', host:mpIsHost});
+      await ch.track({name:(players[activeP]&&players[activeP].name)||'Player', host:mpIsHost, outfit:currentOutfit});
       $('mpStatus').textContent = asHost ? '🌐 Room '+code+' — waiting for friends…' : '🌐 Joined room '+code;
       showMsg(asHost ? '🌐 ROOM '+code+' CREATED — share the code!' : '🌐 JOINED ROOM '+code, 2200);
+      mpUpdatePlayBtn();
     } else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT'){
       $('mpStatus').textContent='❌ Connection failed — try again';
     }
@@ -2515,17 +2589,19 @@ function mpSyncPresence(ch){
     seen.add(key);
     if(!netPlayers[key]){
       const meta=state[key][0]||{};
-      netPlayers[key]=mpMakeNetPlayer(key, meta.name||'Friend');
+      netPlayers[key]=mpMakeNetPlayer(key, meta.name||'Friend', meta.outfit);
     }
   }
   for(const id in netPlayers){ if(!seen.has(id)) mpRemoveNetPlayer(id); }
   const st=$('mpStatus'); if(st) st.textContent = '🌐 Room '+mpRoomCode+' — '+n+' player'+(n===1?'':'s')+' connected';
 }
-function mpMakeNetPlayer(id,name){
-  const b=makeBot(name);
-  return {id,name,mesh:b.mesh,head:b.head,body:b.body,tag:b.tag,tagCv:b.tagCv,tagTex:b.tagTex,hpShown:-1,col:b.col,
+function mpMakeNetPlayer(id,name,outfit){
+  const b=makeBot(name,outfit);
+  const np={id,name,mesh:b.mesh,head:b.head,body:b.body,tag:b.tag,tagCv:b.tagCv,tagTex:b.tagTex,hpShown:-1,col:b.col,
     tx:b.mesh.position.x,ty:0,tz:b.mesh.position.z,tyaw:0,alive:true,swing:0,phase:rand(0,6),
     legL:b.legL,legR:b.legR,armL:b.armL,armR:b.armR,moving:false,hp:100,maxHp:100,boss:false};
+  drawTag(np);   // WAVE3: friends never had their nametag sprite drawn at all — render it once up front
+  return np;
 }
 function mpRemoveNetPlayer(id){
   if(netPlayers[id]){ scene.remove(netPlayers[id].mesh); delete netPlayers[id]; }
@@ -2548,12 +2624,15 @@ function mpUpdateNetPlayers(dt){
     np.legL.rotation.x=sw; np.legR.rotation.x=-sw; np.armL.rotation.x=-sw*.85; np.armR.rotation.x=sw*.85;
   }
 }
+let mpFacingYaw=0;   // WAVE3: friends should see you turn to face where you're walking, not where you're aiming
 function mpBroadcastState(now){
   if(!mpChannel || now-mpLastSend<80) return;   // ~12Hz
   mpLastSend=now;
+  const moveSpd=Math.hypot(player.vel.x,player.vel.z);
+  if(moveSpd>.3) mpFacingYaw=Math.atan2(-player.vel.x,-player.vel.z);
   mpChannel.send({type:'broadcast', event:'state', payload:{
-    id:mpPlayerId, x:player.pos.x, y:player.pos.y-EYE, z:player.pos.z, yaw:player.yaw, alive:player.alive,
-    moving: Math.hypot(player.vel.x,player.vel.z)>.3 }});
+    id:mpPlayerId, x:player.pos.x, y:player.pos.y-EYE, z:player.pos.z, yaw:mpFacingYaw, alive:player.alive,
+    moving: moveSpd>.3 }});
 }
 function mpBroadcastHostState(now){
   if(!mpChannel || !mpIsHost || now-mpLastHostSend<130) return;   // ~7-8Hz
@@ -2890,7 +2969,19 @@ function lose(by){
 $('again').onclick=()=>location.reload();
 
 // ---------- start ----------
-$('playBtn').onclick=()=>{
+function mulberry32(seed){   // WAVE3: tiny seeded PRNG so host+joiners roll identical loot layouts
+  let a=seed>>>0;
+  return function(){
+    a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function beginMatch(mp){
+  if(mp){ diffIx=mp.diffIx; botCount=mp.botCount; mutator=mp.mutator; }
+  const rnd = (mp && mp.seed!=null) ? mulberry32(mp.seed) : Math.random;
+  const mrand=(a,b)=>a+rnd()*(b-a);
   ac = ac||new AC();
   D = DIFFS[diffIx];
   player.name=$('pname').value.trim()||'Player';
@@ -2900,19 +2991,19 @@ $('playBtn').onclick=()=>{
   { const fs=findFreeSpot(player.pos.x, player.pos.z); player.pos.x=fs.x; player.pos.z=fs.z; }
   running=true; startedAt=performance.now(); grace=30; $('graceT').style.display='block';
   // spawn world loot + bots per difficulty
-  for(let i=0;i<D.chests;i++) spawnChest(rand(-MAP*.75,MAP*.75), rand(-MAP*.75,MAP*.75));
-  spawnChest(player.pos.x+rand(-8,8), player.pos.z-10);      // one near spawn
-  for(const f of forts) spawnChest(f.x+rand(-2,2), f.z+rand(-2,2));   // loot inside forts — worth the ambush risk
+  for(let i=0;i<D.chests;i++) spawnChest(mrand(-MAP*.75,MAP*.75), mrand(-MAP*.75,MAP*.75));
+  spawnChest(player.pos.x+mrand(-8,8), player.pos.z-10);      // one near spawn
+  for(const f of forts) spawnChest(f.x+mrand(-2,2), f.z+mrand(-2,2));   // loot inside forts — worth the ambush risk
   for(const s of towerChestSpots) spawnChest(s.x, s.z, s.y);          // WAVE2: tower loot — rooftop + ground floor
-  if(mutator!=='knives') for(let i=0;i<8;i++) spawnFloorGun(lootGunKey(), rand(-MAP*.7,MAP*.7), rand(-MAP*.7,MAP*.7));   // WAVE2 mutators
-  for(let i=0;i<18;i++) spawnPickup(['shield','med','shield','ammo'][i%4], rand(-MAP*.7,MAP*.7), rand(-MAP*.7,MAP*.7));
+  if(mutator!=='knives') for(let i=0;i<8;i++) spawnFloorGun(lootGunKey(), mrand(-MAP*.7,MAP*.7), mrand(-MAP*.7,MAP*.7));   // WAVE2 mutators
+  for(let i=0;i<18;i++) spawnPickup(['shield','med','shield','ammo'][i%4], mrand(-MAP*.7,MAP*.7), mrand(-MAP*.7,MAP*.7));
   if(mpIsHost){   // WAVE3: joining friends mirror the host's bots/boss over the network instead of spawning their own
     const nBots = botCount || D.bots;
     for(let i=0;i<nBots;i++) bots.push(makeBot(BOT_NAMES[i%BOT_NAMES.length]));
   }
   makeKart(player.pos.x+5, player.pos.z-4);                        // kart parked near spawn
-  makeKart(rand(-MAP*.55,MAP*.55), rand(-MAP*.55,MAP*.55));        // one random
-  dropTimer=rand(35,50);
+  makeKart(mrand(-MAP*.55,MAP*.55), mrand(-MAP*.55,MAP*.55));      // one random
+  dropTimer=mrand(35,50);
   invReset(); buildViewmodel(); updateAlive(); updateBars(); updateWood();
   // WAVE2: mutators — legit game modes, NOT cheats (scores submit as normal)
   if(mutator==='wild'){ giveWeaponBase('deagle', 1); showMsg('🤠 WILD WEST — deagles only!',1800); }
@@ -2920,6 +3011,16 @@ $('playBtn').onclick=()=>{
   else if(mutator==='knives'){ showMsg('🔪 KNIVES ONLY — get stabby!',1800); }
   while(pendingCheats.length) pendingCheats.shift()();   // IDKFA/HANSOLO typed in lobby
   showMsg(`🚌 DROPPED IN — ${D.name}<br><small>find a chest, grab a gun</small>`);
+}
+$('playBtn').onclick=()=>{
+  if(mpChannel && !mpIsHost) return;   // joiners can't self-start — waiting message covers the button anyway
+  if(mpChannel && mpIsHost){
+    const seed=(Math.random()*2**31)|0;
+    mpChannel.send({type:'broadcast', event:'start', payload:{diffIx, botCount, mutator, seed}});
+    beginMatch({diffIx, botCount, mutator, seed});
+  } else {
+    beginMatch();
+  }
 };
 renderer.domElement.addEventListener('click', ()=>{ if(running&&!locked&&!isTouch) lockPtr(); });
 
