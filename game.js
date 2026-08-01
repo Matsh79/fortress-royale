@@ -172,7 +172,10 @@ let previewRenderer=null, previewScene=null, previewCamera=null, previewGroup=nu
 function ensurePreview(){
   if(previewRenderer) return;
   const canvas=$('peOutfitPreview');
-  previewRenderer=new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  if(!canvas){ console.warn('[outfit preview] #peOutfitPreview canvas not found in the page — likely an old cached page; hard-refresh (Ctrl/Cmd+Shift+R).'); return; }
+  try{
+    previewRenderer=new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  } catch(e){ console.warn('[outfit preview] WebGL init failed:', e); return; }
   previewRenderer.setSize(260,260,false);
   previewScene=new THREE.Scene();
   previewCamera=new THREE.PerspectiveCamera(34,1,0.1,20);
@@ -183,6 +186,7 @@ function ensurePreview(){
 }
 function buildPreviewOutfit(pl){
   ensurePreview();
+  if(!previewRenderer) return;   // canvas missing / WebGL unavailable — fail quietly, rest of the editor still works
   if(previewGroup) previewScene.remove(previewGroup);
   const outfit=pl.outfit||defaultOutfit();
   const g=new THREE.Group();

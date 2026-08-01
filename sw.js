@@ -1,4 +1,4 @@
-const CACHE_NAME='fr-v2';
+const CACHE_NAME='fr-v3';
 self.addEventListener('install', e=>self.skipWaiting());
 self.addEventListener('activate', e=>e.waitUntil(
   caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))).then(()=>clients.claim())
