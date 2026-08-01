@@ -2180,7 +2180,7 @@ function botThink(b,dt,now){
       if(!b.moving && stormPanic) b.safeSpot=null;   // fully cornered → pick a new safe spot next tick
     }
     // face the direction actually being walked (not the player) — smoothed turn, purely cosmetic (botFire aims independently)
-    const tYaw=Math.atan2(-dir.x,-dir.z), cy=b.mesh.rotation.y;
+    const tYaw=Math.atan2(dir.x,dir.z), cy=b.mesh.rotation.y;
     b.mesh.rotation.y = cy + Math.atan2(Math.sin(tYaw-cy), Math.cos(tYaw-cy))*Math.min(1,dt*10);
   }
   // limb swing: advance phase while walking, ease out when stopped (arms/legs opposite phase)
@@ -2629,7 +2629,7 @@ function mpBroadcastState(now){
   if(!mpChannel || now-mpLastSend<80) return;   // ~12Hz
   mpLastSend=now;
   const moveSpd=Math.hypot(player.vel.x,player.vel.z);
-  if(moveSpd>.3) mpFacingYaw=Math.atan2(-player.vel.x,-player.vel.z);
+  if(moveSpd>.3) mpFacingYaw=Math.atan2(player.vel.x,player.vel.z);
   mpChannel.send({type:'broadcast', event:'state', payload:{
     id:mpPlayerId, x:player.pos.x, y:player.pos.y-EYE, z:player.pos.z, yaw:mpFacingYaw, alive:player.alive,
     moving: moveSpd>.3 }});
@@ -3012,11 +3012,14 @@ function beginMatch(mp){
   while(pendingCheats.length) pendingCheats.shift()();   // IDKFA/HANSOLO typed in lobby
   showMsg(`🚌 DROPPED IN — ${D.name}<br><small>find a chest, grab a gun</small>`);
 }
-$('playBtn').onclick=()=>{
+$('playBtn').onclick=async ()=>{
   if(mpChannel && !mpIsHost) return;   // joiners can't self-start — waiting message covers the button anyway
   if(mpChannel && mpIsHost){
     const seed=(Math.random()*2**31)|0;
-    mpChannel.send({type:'broadcast', event:'start', payload:{diffIx, botCount, mutator, seed}});
+    try {
+      const res=await mpChannel.send({type:'broadcast', event:'start', payload:{diffIx, botCount, mutator, seed}});
+      if(res!=='ok') showMsg('⚠ Could not reach your party — starting anyway. Friends may need to rejoin.',2600);
+    } catch(e){ showMsg('⚠ Could not reach your party — starting anyway. Friends may need to rejoin.',2600); }
     beginMatch({diffIx, botCount, mutator, seed});
   } else {
     beginMatch();
