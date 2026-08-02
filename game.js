@@ -741,9 +741,6 @@ function hill(x,z,tiers=6,baseR=15,topR=3.5,stepH=.58){
     obstacles.push({min:b.min,max:b.max,mesh:m});
   }
 }
-const HILLS=[{x:100,z:60},{x:-65,z:80},{x:0,z:-125}];   // clear of forts/towers — good sniping vantage points
-for(const h of HILLS) hill(h.x,h.z);
-
 // ---------- enterable forts (walk in the door, ambush from inside) ----------
 function fort(x,z,c){
   const W=12, H=4.5, T=.6, DOOR=3;
@@ -822,6 +819,27 @@ function tower(x,z,storeys){
 }
 const towers=TOWERS.map(t=>tower(t.x,t.z,t.s));
 
+// ---------- scatter grassy hills — random, but clear of everything already built ----------
+function hillClear(x,z,r){
+  if(Math.hypot(x,z)>MAP-r-4) return false;
+  for(let a=0;a<Math.PI*2;a+=Math.PI/4){
+    if(collides(new THREE.Vector3(x+Math.cos(a)*r, 0, z+Math.sin(a)*r), 1, 0)) return false;
+  }
+  return !collides(new THREE.Vector3(x,0,z),1,0);
+}
+{
+  const HILL_COUNT=14;
+  let placed=0, tries=0;
+  while(placed<HILL_COUNT && tries<400){
+    tries++;
+    const x=rand(-MAP*.88,MAP*.88), z=rand(-MAP*.88,MAP*.88);
+    const baseR=rand(9,17);
+    if(!hillClear(x,z,baseR+2)) continue;
+    hill(x,z,6,baseR,baseR*.22,.58);
+    placed++;
+  }
+}
+
 // ---------- grass tufts (purely decorative — skipped in perf mode) ----------
 if(!perfMode){
   const bladeTex = (()=>{
@@ -837,7 +855,7 @@ if(!perfMode){
   const bladeMat = new THREE.MeshBasicMaterial({map:bladeTex, transparent:true, alphaTest:.3, side:THREE.DoubleSide});
   const geoA = new THREE.PlaneGeometry(1.3,1.6); geoA.translate(0,.8,0);
   const geoB = geoA.clone(); geoB.rotateY(Math.PI/2);
-  const N = isTouch ? 120 : 260;
+  const N = isTouch ? 350 : 900;
   const tuftA = new THREE.InstancedMesh(geoA, bladeMat, N);
   const tuftB = new THREE.InstancedMesh(geoB, bladeMat, N);
   tuftA.castShadow=tuftB.castShadow=false;
