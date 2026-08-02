@@ -659,7 +659,7 @@ const palette=[0xd9822b,0xc8b28e,0x9a9a9a,0xb0653a];
 for(let i=0;i<26;i++){ const s=rand(2.4,4.2); box(s,s,s, rand(-MAP*.75,MAP*.75), s/2, rand(-MAP*.75,MAP*.75), palette[i%4], rand(0,Math.PI), crateTex); }
 for(let i=0;i<10;i++){ box(rand(10,18), rand(3.5,6), 1.6, rand(-MAP*.7,MAP*.7), 2.2, rand(-MAP*.7,MAP*.7), 0xcfcabc, rand(0,Math.PI)); }
 const houseWinMat = new THREE.MeshBasicMaterial({color:0x0a0a14});
-for(let i=0;i<6;i++){
+for(let i=0;i<10;i++){
   const x=rand(-MAP*.6,MAP*.6), z=rand(-MAP*.6,MAP*.6), c=[0xf2a24b,0x8fd3f4,0xf47c7c,0xb69cf4][i%4];
   const W=rand(9,11.5), D=rand(9,11.5), H=rand(5,6.6);
   box(W,H,D,x,H/2,z,c);
@@ -688,7 +688,7 @@ const barkTex = (()=>{
 })();
 const barkMat = toonMat({color:0xffffff, map:barkTex});
 const trees=[];
-for(let i=0;i<40;i++){
+for(let i=0;i<60;i++){
   const x=rand(-MAP*.9,MAP*.9), z=rand(-MAP*.9,MAP*.9);
   const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.4,.6,rand(3,5),6), barkMat);
   trunk.position.set(x,2,z); trunk.castShadow=true;
@@ -730,6 +730,20 @@ for(let i=0;i<10;i++){
     obstacles.push({min:bb.min,max:bb.max,mesh:rock});
   }
 }
+// ---------- grassy hills (walkable terrain — each tier is a small step-up, so you just walk up) ----------
+function hill(x,z,tiers=6,baseR=15,topR=3.5,stepH=.58){
+  for(let i=0;i<tiers;i++){
+    const r0 = baseR + (topR-baseR)*(i/tiers);
+    const r1 = baseR + (topR-baseR)*((i+1)/tiers);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r1,r0,stepH,20), toonMat({color:0xffffff, map:grassTex}));
+    m.position.set(x, i*stepH+stepH/2, z); m.castShadow=m.receiveShadow=true; scene.add(m);
+    const b=new THREE.Box3().setFromObject(m);
+    obstacles.push({min:b.min,max:b.max,mesh:m});
+  }
+}
+const HILLS=[{x:100,z:60},{x:-65,z:80},{x:0,z:-125}];   // clear of forts/towers — good sniping vantage points
+for(const h of HILLS) hill(h.x,h.z);
+
 // ---------- enterable forts (walk in the door, ambush from inside) ----------
 function fort(x,z,c){
   const W=12, H=4.5, T=.6, DOOR=3;
@@ -807,6 +821,44 @@ function tower(x,z,storeys){
   return {x,z,h:ry};
 }
 const towers=TOWERS.map(t=>tower(t.x,t.z,t.s));
+
+// ---------- grass tufts (purely decorative — skipped in perf mode) ----------
+if(!perfMode){
+  const bladeTex = (()=>{
+    const cv=texCanvas(32), cx=cv.getContext('2d');
+    cx.clearRect(0,0,32,32);
+    [[6,'#3fa02c'],[16,'#63d24d'],[25,'#48b134']].forEach(([bx,col])=>{
+      cx.fillStyle=col; cx.beginPath();
+      cx.moveTo(bx-3,32); cx.lineTo(bx-.5,5); cx.lineTo(bx+3,32); cx.closePath(); cx.fill();
+    });
+    const t=new THREE.CanvasTexture(cv);
+    return t;
+  })();
+  const bladeMat = new THREE.MeshBasicMaterial({map:bladeTex, transparent:true, alphaTest:.3, side:THREE.DoubleSide});
+  const geoA = new THREE.PlaneGeometry(1.3,1.6); geoA.translate(0,.8,0);
+  const geoB = geoA.clone(); geoB.rotateY(Math.PI/2);
+  const N = isTouch ? 120 : 260;
+  const tuftA = new THREE.InstancedMesh(geoA, bladeMat, N);
+  const tuftB = new THREE.InstancedMesh(geoB, bladeMat, N);
+  tuftA.castShadow=tuftB.castShadow=false;
+  const mtx=new THREE.Matrix4(), q=new THREE.Quaternion(), pos=new THREE.Vector3(), scl=new THREE.Vector3();
+  let placed=0, tries=0;
+  while(placed<N && tries<N*6){
+    tries++;
+    const x=rand(-MAP*.92,MAP*.92), z=rand(-MAP*.92,MAP*.92);
+    if(Math.hypot(x,z)>MAP-3) continue;
+    if(collides(new THREE.Vector3(x,0,z),1.0,0)) continue;
+    pos.set(x,0,z);
+    q.setFromAxisAngle(new THREE.Vector3(0,1,0), rand(0,Math.PI*2));
+    const s=rand(.8,1.4); scl.set(s,rand(.8,1.3),s);
+    mtx.compose(pos,q,scl);
+    tuftA.setMatrixAt(placed,mtx); tuftB.setMatrixAt(placed,mtx);
+    placed++;
+  }
+  tuftA.count=tuftB.count=placed;
+  tuftA.instanceMatrix.needsUpdate=tuftB.instanceMatrix.needsUpdate=true;
+  scene.add(tuftA,tuftB);
+}
 
 // ---------- storm ----------
 let stormR=240, stormTarget=240, stormShrinkRate=0;
