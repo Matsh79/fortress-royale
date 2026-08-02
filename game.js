@@ -828,9 +828,9 @@ function hillClear(x,z,r){
   return !collides(new THREE.Vector3(x,0,z),1,0);
 }
 {
-  const HILL_COUNT=14;
+  const HILL_COUNT=20;
   let placed=0, tries=0;
-  while(placed<HILL_COUNT && tries<400){
+  while(placed<HILL_COUNT && tries<700){
     tries++;
     const x=rand(-MAP*.88,MAP*.88), z=rand(-MAP*.88,MAP*.88);
     const baseR=rand(9,17);
@@ -855,7 +855,7 @@ if(!perfMode){
   const bladeMat = new THREE.MeshBasicMaterial({map:bladeTex, transparent:true, alphaTest:.3, side:THREE.DoubleSide});
   const geoA = new THREE.PlaneGeometry(1.3,1.6); geoA.translate(0,.8,0);
   const geoB = geoA.clone(); geoB.rotateY(Math.PI/2);
-  const N = isTouch ? 350 : 900;
+  const N = isTouch ? 1200 : 3500;
   const tuftA = new THREE.InstancedMesh(geoA, bladeMat, N);
   const tuftB = new THREE.InstancedMesh(geoB, bladeMat, N);
   tuftA.castShadow=tuftB.castShadow=false;
