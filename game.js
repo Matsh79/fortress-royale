@@ -840,44 +840,6 @@ function hillClear(x,z,r){
   }
 }
 
-// ---------- grass tufts (purely decorative — skipped in perf mode) ----------
-if(!perfMode){
-  const bladeTex = (()=>{
-    const cv=texCanvas(32), cx=cv.getContext('2d');
-    cx.clearRect(0,0,32,32);
-    [[6,'#3fa02c'],[16,'#63d24d'],[25,'#48b134']].forEach(([bx,col])=>{
-      cx.fillStyle=col; cx.beginPath();
-      cx.moveTo(bx-3,32); cx.lineTo(bx-.5,5); cx.lineTo(bx+3,32); cx.closePath(); cx.fill();
-    });
-    const t=new THREE.CanvasTexture(cv);
-    return t;
-  })();
-  const bladeMat = new THREE.MeshBasicMaterial({map:bladeTex, transparent:true, alphaTest:.3, side:THREE.DoubleSide});
-  const geoA = new THREE.PlaneGeometry(1.3,1.6); geoA.translate(0,.8,0);
-  const geoB = geoA.clone(); geoB.rotateY(Math.PI/2);
-  const N = isTouch ? 1200 : 3500;
-  const tuftA = new THREE.InstancedMesh(geoA, bladeMat, N);
-  const tuftB = new THREE.InstancedMesh(geoB, bladeMat, N);
-  tuftA.castShadow=tuftB.castShadow=false;
-  const mtx=new THREE.Matrix4(), q=new THREE.Quaternion(), pos=new THREE.Vector3(), scl=new THREE.Vector3();
-  let placed=0, tries=0;
-  while(placed<N && tries<N*6){
-    tries++;
-    const x=rand(-MAP*.92,MAP*.92), z=rand(-MAP*.92,MAP*.92);
-    if(Math.hypot(x,z)>MAP-3) continue;
-    if(collides(new THREE.Vector3(x,0,z),1.0,0)) continue;
-    pos.set(x,0,z);
-    q.setFromAxisAngle(new THREE.Vector3(0,1,0), rand(0,Math.PI*2));
-    const s=rand(.8,1.4); scl.set(s,rand(.8,1.3),s);
-    mtx.compose(pos,q,scl);
-    tuftA.setMatrixAt(placed,mtx); tuftB.setMatrixAt(placed,mtx);
-    placed++;
-  }
-  tuftA.count=tuftB.count=placed;
-  tuftA.instanceMatrix.needsUpdate=tuftB.instanceMatrix.needsUpdate=true;
-  scene.add(tuftA,tuftB);
-}
-
 // ---------- storm ----------
 let stormR=240, stormTarget=240, stormShrinkRate=0;
 const stormMat = new THREE.MeshBasicMaterial({color:0x9b30ff,transparent:true,opacity:.3,side:THREE.DoubleSide,depthWrite:false});
